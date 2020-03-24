@@ -7,3 +7,8 @@ being developed under the aegis of
 [JOGL](https://app.jogl.io/project/151) and the
 [OpenCovid19 Initiative](https://app.jogl.io/program/2).  It is answering
 the [Code Life Ventilator Challenge](https://www.agorize.com/en/challenges/code-life-challenge/).
+
+Components:
+
+ - [Display App](./display_app/README.md)
+

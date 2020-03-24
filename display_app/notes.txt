@@ -1,0 +1,4 @@
+
+
+An android app that's known to work to communicate to our target
+Arduino hardware:  https://github.com/kai-morich/SimpleUsbTerminal
