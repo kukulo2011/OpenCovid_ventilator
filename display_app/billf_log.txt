@@ -1,0 +1,43 @@
+
+24/3/20
+=======
+
+Installed Kair Morich's "Serial USB Terminal" app from play store on
+Galaxy Note5 phone.  USB had no driver, tried selecting "CDC" driver
+from menu.  Menu -> USB Devices -> Serial showed 19.2 Kbaud, 8 bit, no
+parity, one stop bit.  Menu -> USB Devices -> click on device:  It asks
+for permission.  Granted. , and clicked "use by default for this USB
+device."  Got "Connection failed:  No control endpoint."
+
+On Linux, lsusb tells me the USB port I'm using is
+    Bus 001 Device 015: ID 04e8:6860 Samsung Electronics Co., Ltd Galaxy (MTP)
+(Device # increments if I unplug & plug back in).
+    Ah - maps to something like /dev/bus/usb/001/015 on Ubuntu (018 by now :-) )
+    dmesg -w tells me the device # when I plug it in
+lsusb tells me that that is an MTP device, so maybe I need to disable that
+first?  Tried FTDI driver, now 8 ports are listed for device
+05C6 909E on phone.  But, a couple of times I got my phone to hang...  Needed
+home-vol down to get it back!
+
+Change of plans:  I'll try making an app using the standard serial API, and
+see if it works for folks who have the board.  I don't know if I'm missing
+configuration on Android, on Linux, or on both.
+
+
+==> I suspect that some kind of configuration is needed on the Linux side.
+I think my Android phone was looking for a device connected to the USB
+port using the CDC protocol, and not finding one.  Maybe the Linux USB 
+port need to be put into "peripheral" mode (as opposed to device mode).  
+This might not be possible - random googling found a link that says
+"Most PCs support USB host mode exclusively"  - cf.
+https://developer.toradex.com/knowledge-base/usb-device-mode-(linux)
+
+Found https://pub.dev/packages/usb_serial.  I'll try that, and see if Juraj
+or Adam can connect to their hardware using my app, based on that.  If not,
+I can always adapt the app from above.
+
+"adb install build/app/outputs/apk/app.apk" does not work...
+Need "flutter build appbundle", which creates
+build/app/outputs/bundle/release/app.aab.  Then,
+bundletool build-apks --bundle=build/app/outputs/bundle/release/app-release.aab --output=~/tmp/tmp/breezy.apks
+Then, bundletool install-apks --apks=~/tmp/tmp/breezy.apks
