@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io' show exit;
-import 'serial.dart';
+import 'serial_test.dart';
+import 'graphs_screen.dart';
 
 /*
 MIT License
@@ -71,13 +72,12 @@ class BreezyHomePage extends StatelessWidget {
                     MaterialPageRoute(builder: (context) => SerialTestPage()));
               }),
           const SizedBox(height: 30),
-          Builder(
-              builder: (BuildContext context) => RaisedButton(
-                  child: const Text('Show Fake Graphs', style: bigTextStyle),
-                  onPressed: () {
-                    Scaffold.of(context)
-                        .showSnackBar(SnackBar(content: Text('TODO')));
-                  }))
+          RaisedButton(
+            child: const Text('Show Fake Graphs', style: bigTextStyle),
+            onPressed: () {
+              Navigator.push<void>(context,
+              MaterialPageRoute(builder: (context) => GraphsScreen()));
+            }),
         ])));
   }
 }
