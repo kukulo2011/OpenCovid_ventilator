@@ -13,7 +13,7 @@ breezy,1,1254,170.3,3.6,77.3,-1
 breezy,1,1275,70.3,4.2,67.3,-1
 etc.
 TODO:  Fill in a real capture from the device, with 
-       the correct number of samples.
+       the correct number of data values.
 ```
 It's a simple CSV (comma-separated values) text line, terminated by
 a carriage-return/line-feed.  Integers are represented as decimal
