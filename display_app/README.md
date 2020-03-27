@@ -14,6 +14,15 @@ installed the app, and presumably switched the serial cable to the device under 
 should be able to run it.  The power button in the upper-right hand corner of the display
 screen does an `exit(0)` system call, which kills the process and should clean everything up.
 
+## Platforrms
+
+This application targets all Android platforms on which Flutter is supported.
+As of this writing, all of the libraries support iOS as well, so it should work
+on iPhone, but this has not been tested.  Flutter is available on Android devices
+"armeabi-v7a (ARM 32-bit), arm64-v8a (ARM 64-bit), and x86-64 (x86 64-bit).  
+Flutter does not currently support building for x86 Android." - see 
+https://flutter.dev/docs/deployment/android#what-are-the-supported-target-architectures.
+
 ## Building
 
 Development is being done on Android Studio.  That's a big download and a lot of
