@@ -1,10 +1,8 @@
 import 'dart:math';
-
-import 'package:flutter/material.dart';
-import 'package:pedantic/pedantic.dart';
-import 'package:charts_flutter/flutter.dart' as charts;
-import 'dart:collection' show DoubleLinkedQueue;
 import 'dart:async' show Timer;
+import 'package:flutter/material.dart';
+import 'package:charts_flutter/flutter.dart' as charts;
+import 'rolling_deque.dart';
 
 /*
 MIT License
@@ -30,14 +28,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-/**
- * The screen where all the fancy graphs are shown.  This is the primary
- * screen for this app.
- *
- * All the state is put at the top for simplicity.  At least in the initial app,
- * everything is updated at the same time, so it doesn't really make sense to
- * try to optimize display if only part of the screen changes.
- */
+///
+/// The screen where all the fancy graphs are shown.  This is the primary
+/// screen for this app.
+///
+/// All the state is put at the top for simplicity.  At least in the initial app,
+/// everything is updated at the same time, so it doesn't really make sense to
+/// try to optimize display if only part of the screen changes.
+///
 class GraphsScreen extends StatefulWidget {
   GraphsScreen({Key key}) : super(key: key);
 
@@ -46,18 +44,16 @@ class GraphsScreen extends StatefulWidget {
 }
 
 class _GraphsScreenState extends State<GraphsScreen> {
-
   double _currTime = 0;
-  final _data = DoubleLinkedQueue<Data>();
+  final _data =
+      RollingDeque(500, 10, 0.5, (double time) => Data(time, null, null, null));
   static final _random = Random();
-  static final _gap = 0.5;  // # of seconds of gap in rolling chart
   static Timer _timer;
 
   @override
   void initState() {
     super.initState();
     _timer = Timer.periodic(Duration(milliseconds: 20), (_) => _tick());
-    _data.add(Data(_gap / 2, null));
   }
 
   @override
@@ -68,103 +64,140 @@ class _GraphsScreenState extends State<GraphsScreen> {
 
   void _tick() {
     final frobbed = _currTime.remainder(3.7);
-    final double v = _random.nextDouble() * 0.5 + ( frobbed < 1.5 ? 1.0 : 7.0 );
+    final double v1 = _random.nextDouble() * 0.5 + (frobbed < 1.5 ? 1.0 : 7.0);
+    final double v2 = (frobbed < 1.5 ? frobbed * 5 : 2.0);
+    final double v3 = 5 + 6 * sin(_currTime); // Some out of range
     setState(() {
-      _data.lastEntry().element = Data(_currTime, v);
-      _data.add(Data(_currTime + _gap / 2, null));
-      while (_data.first.time < _currTime - (10 - _gap)) {
-        _data.removeFirst();
-      }
+      _data.append(Data(_currTime, v1, v2, v3));
     });
     _currTime += 0.020;
   }
 
   @override
   Widget build(BuildContext context) {
+    final windowData = _data.rollingWindow.toList(growable: false);
     return Scaffold(
-        body: Container(
-            decoration: const BoxDecoration(
-                border: Border(
-                    top: BorderSide(width: 30, color: Colors.transparent),
-                    left: BorderSide(width: 10, color: Colors.transparent),
-                    right: BorderSide(width: 10, color: Colors.transparent),
-                    bottom: BorderSide(width: 10, color: Colors.transparent))),
-            child: RollingChart(
-              maxValue: 10,
-              data: _data.toList(growable: false)
-            )));
+        body: SafeArea(
+      child: Container(
+          decoration: const BoxDecoration(
+              border: Border(
+                  top: BorderSide(width: 5, color: Colors.transparent),
+                  left: BorderSide(width: 5, color: Colors.transparent),
+                  right: BorderSide(width: 5, color: Colors.transparent),
+                  bottom: BorderSide(width: 0, color: Colors.transparent))),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(children: [
+                  Expanded(
+                      child: RollingChart<Data>(
+                          maxValue: 10,
+                          windowSize: _data.windowSize,
+                          data: windowData,
+                          dataSelector: (d) => d.v1)),
+                  Expanded(
+                      child: RollingChart<Data>(
+                          maxValue: 10,
+                          windowSize: _data.windowSize,
+                          data: windowData,
+                          dataSelector: (d) => d.v2)),
+                  Expanded(
+                      child: RollingChart<Data>(
+                          maxValue: 10,
+                          windowSize: _data.windowSize,
+                          data: windowData,
+                          dataSelector: (d) => d.v3)),
+                ]),
+              ),
+              Column(children: [
+                Text('THIS AREA TBD'),
+                Text('THIS AREA TBD'),
+                Text('THIS AREA TBD'),
+                Text('THIS AREA TBD'),
+              ])
+            ],
+          )),
+    ));
   }
 }
 
-/**
- * A rolling chart.  The X axis is time, from 0 to 10 seconds.  Numbers
- * aren't given, and there's a 1/2 second black "gap" marking the current
- * time.
- */
-class RollingChart extends StatelessWidget {
-
+/// A rolling chart.  The X axis is time, from 0 to windowSize.  Numbers
+/// aren't given, and there's a 1/2 second black "gap" marking the current
+/// time.
+class RollingChart<D extends RollingDequeData> extends StatelessWidget {
   final double _maxValue;
-  final List<Data> _data;
+  final double _windowSize;
+  final List<D> _data;
+  final double Function(D) _dataSelector;
 
-  RollingChart({@required double maxValue, @required List<Data> data}) :
-      this._maxValue = maxValue, this._data = data {
-    _data.sort((a, b) {
-      final av = a.time.remainder(10.0);
-      final bv = b.time.remainder(10.0);
-      if (av < bv) {
-        return -1;
-      } else if (av == bv) {
-        return 0;
-      } else {
-        return 1;
-      }
-    });
-  }
+  /// [data] must be sorted by time.remainder(window size).
+  RollingChart(
+      {@required double maxValue,
+      @required double windowSize,
+      @required List<D> data,
+      @required double Function(D) dataSelector})
+      : this._maxValue = maxValue,
+        this._windowSize = windowSize,
+        this._data = data,
+        this._dataSelector = dataSelector;
 
   @override
   Widget build(BuildContext context) {
-    return charts.LineChart(<charts.Series<Data, double>>[
-      charts.Series<Data, double>(
-        id: 'set_scale',
-        colorFn: (_, __) => charts.Color.transparent,
-        domainFn: (d, _) => d.time,
-        measureFn: (d, _) => d.value,
-        data: [Data(0, _maxValue)]    // Hack to keep Ymax constant
-      ),
-      charts.Series<Data, double>(
+    final numTicks = max(0, _windowSize.floor()) + 1;
+    final tickSpecs = List<charts.TickSpec<double>>(numTicks);
+    for (int i = 0; i < numTicks; i++) {
+      tickSpecs[i] = charts.TickSpec(i.toDouble(), label: '');
+    }
+    return charts.LineChart(<charts.Series<D, double>>[
+      charts.Series<D, double>(
+          id: 'set_scale', // Hack to keep Ymax constant
+          colorFn: (_, __) => charts.Color.transparent,
+          domainFn: (d, _) => 0,
+          measureFn: (d, _) => _maxValue,
+          data: [null]),
+      charts.Series<D, double>(
           id: 'data',
-          colorFn: (_, __) => charts.MaterialPalette.blue.shadeDefault,
-          domainFn: (d, _) => d.time.remainder(10.0),
-          measureFn: (d, _) => d.value,
-          data: _data
-      )],
-      domainAxis: charts.NumericAxisSpec(
-        // Eventually, fill in to get thicker ticks:
-        //      renderSpec: charts.SmallTickRendererSpec<double>(),
-        tickProviderSpec: charts.StaticNumericTickProviderSpec([
-          charts.TickSpec(0.0, label: ''),
-          charts.TickSpec(1.0, label: ''),
-          charts.TickSpec(2.0, label: ''),
-          charts.TickSpec(3.0, label: ''),
-          charts.TickSpec(4.0, label: ''),
-          charts.TickSpec(5.0, label: ''),
-          charts.TickSpec(6.0, label: ''),
-          charts.TickSpec(7.0, label: ''),
-          charts.TickSpec(8.0, label: ''),
-          charts.TickSpec(9.0, label: ''),
-          charts.TickSpec(10.0, label: '')
-        ])
-      ),
-      animate: false);
+          colorFn: (d, __) {
+            final v = _dataSelector(d);
+            if (v == null) {
+              return charts.MaterialPalette.blue.shadeDefault;
+            } else if (v < 0.0 || v > _maxValue) {
+              return charts.MaterialPalette.red.shadeDefault;
+            } else {
+              return charts.MaterialPalette.blue.shadeDefault;
+            }
+          },
+          domainFn: (d, _) => d.time.remainder(_windowSize),
+          measureFn: (d, _) {
+            final v = _dataSelector(d);
+            if (v == null) {
+              return null;
+            } else if (v < 0.0) {
+              return 0.0;
+            } else if (v > _maxValue) {
+              return _maxValue;
+            } else {
+              return v;
+            }
+          },
+          data: _data)
+    ],
+        domainAxis: charts.NumericAxisSpec(
+            // Eventually, fill in to get thicker ticks:
+            //      renderSpec: charts.SmallTickRendererSpec<double>(),
+            tickProviderSpec: charts.StaticNumericTickProviderSpec(tickSpecs)),
+        animate: false);
   }
 }
 
 // A temporary Data class.  The final program will have one instance for
 // each time value, and a selector function.
-class Data {
+class Data implements RollingDequeData {
+  @override
   final double time;
-  final double value;
+  final double v1;
+  final double v2;
+  final double v3;
 
-  Data(this.time, this.value);
+  Data(this.time, this.v1, this.v2, this.v3);
 }
-

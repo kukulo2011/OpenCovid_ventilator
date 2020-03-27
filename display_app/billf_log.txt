@@ -41,3 +41,31 @@ Need "flutter build appbundle", which creates
 build/app/outputs/bundle/release/app.aab.  Then,
 bundletool build-apks --bundle=build/app/outputs/bundle/release/app-release.aab --output=~/tmp/tmp/breezy.apks
 Then, bundletool install-apks --apks=~/tmp/tmp/breezy.apks
+
+26/3/2020:
+Trying to upload a test .aab via
+https://play.google.com/apps/publish/internalappsharing/.  Play store
+won't let me upload com.jovial.breezy, because that's never been published.
+They're quoting 7 day review times.
+Trying to release to "internal test" in play store.
+Made signing key following
+https://flutter.dev/docs/deployment/android#signing-the-app
+It seemed to work, BUT the "publish" button was greyed out.  I think
+a human needs to review, and they're quoting 7 days.
+
+android/app/build.gradle is where com.jovial.breezy app ID is set.
+I changed it to com.jovial.jrpn, and successfully got an app sharing
+link under that package name.  To download in the play store, you need to
+follow the instructions at
+https://support.google.com/googleplay/android-developer/answer/9303479?hl=en
+under "How authorized testers turn on internal app sharing".  Yes,
+you press the version 7 times.  Once enabled, you send the link
+to your phone (gmail, ...), and click on it.  It should take you to
+the store, and ask if you want an experimental version of JRPN.
+
+https://flutter.dev/docs/deployment/android describes
+    flutter build apk --split-per-abi
+That might work - it makes 3 big .apk files:
+✓ Built build/app/outputs/apk/release/app-armeabi-v7a-release.apk (5.5MB).
+✓ Built build/app/outputs/apk/release/app-arm64-v8a-release.apk (5.8MB).
+✓ Built build/app/outputs/apk/release/app-x86_64-release.apk (5.9MB).

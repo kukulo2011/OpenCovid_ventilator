@@ -1,3 +1,5 @@
+./breezy/android/key.properties
+
 # Built application files
 *.apk
 *.aar
