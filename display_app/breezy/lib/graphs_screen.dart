@@ -2,6 +2,8 @@ import 'dart:math';
 import 'dart:async' show Timer;
 import 'package:flutter/material.dart';
 import 'package:charts_flutter/flutter.dart' as charts;
+import 'package:screen/screen.dart' show Screen;
+import 'package:pedantic/pedantic.dart';
 import 'rolling_deque.dart';
 
 /*
@@ -54,12 +56,14 @@ class _GraphsScreenState extends State<GraphsScreen> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(Duration(milliseconds: 20), (_) => _tick());
+    unawaited(Screen.keepOn(true));
   }
 
   @override
   void dispose() {
     super.dispose();
     _timer.cancel();
+    unawaited(Screen.keepOn(false));
   }
 
   void _tick() {

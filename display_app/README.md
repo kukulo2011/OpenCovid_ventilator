@@ -19,8 +19,8 @@ screen does an `exit(0)` system call, which kills the process and should clean e
 This application targets all Android platforms on which Flutter is supported.
 As of this writing, all of the libraries support iOS as well, so it should work
 on iPhone, but this has not been tested.  Flutter is available on Android devices
-"armeabi-v7a (ARM 32-bit), arm64-v8a (ARM 64-bit), and x86-64 (x86 64-bit).  
-Flutter does not currently support building for x86 Android." - see 
+"armeabi-v7a (ARM 32-bit), arm64-v8a (ARM 64-bit), and x86-64 (x86 64-bit)."  Alas,
+"Flutter does not currently support building for x86 Android." - see 
 https://flutter.dev/docs/deployment/android#what-are-the-supported-target-architectures.
 
 ## Building

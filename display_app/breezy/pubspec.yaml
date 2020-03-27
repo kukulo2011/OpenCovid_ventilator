@@ -12,6 +12,7 @@ dependencies:
   usb_serial: ^0.2.4
   charts_flutter: ^0.9.0
   pedantic: ^1.8.0
+  screen: ^0.0.5
 
 dev_dependencies:
   flutter_test:
