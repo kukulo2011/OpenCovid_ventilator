@@ -73,3 +73,15 @@ billf@Zathras:~/tmp/tmp$ adb install breezy.apk
 ```
 The `.apk` files in the `.apks` archive are already signed.  Depending on hardware, a different
 standalone apk might be appropriate.
+
+### TODO - the better way to distribute and install
+```
+flutter clean
+flutter build appbundle
+```
+Then deploy to play store via internal app sharing.  Or:
+```
+flutter clean
+flutter build apk --split-per-abi
+```
+and upload to github.

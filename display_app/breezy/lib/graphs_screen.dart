@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:charts_flutter/flutter.dart' as charts;
 import 'package:screen/screen.dart' show Screen;
 import 'package:pedantic/pedantic.dart';
+import 'rolling_chart.dart';
 import 'rolling_deque.dart';
+import 'value_box.dart';
 
 /*
 MIT License
@@ -70,7 +72,7 @@ class _GraphsScreenState extends State<GraphsScreen> {
     final frobbed = _currTime.remainder(3.7);
     final double v1 = _random.nextDouble() * 0.5 + (frobbed < 1.5 ? 1.0 : 7.0);
     final double v2 = (frobbed < 1.5 ? frobbed * 5 : 2.0);
-    final double v3 = 5 + 6 * sin(_currTime); // Some out of range
+    final double v3 = 6 * sin(_currTime); // Some out of range
     setState(() {
       _data.append(Data(_currTime, v1, v2, v3));
     });
@@ -79,120 +81,112 @@ class _GraphsScreenState extends State<GraphsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return Theme(
+        data: ThemeData.dark(),
+        child: Scaffold(
+            backgroundColor: Colors.black,
+            body: SafeArea(
+              child: Container(
+                  decoration: const BoxDecoration(
+                      border: Border(
+                          top: BorderSide(width: 5, color: Colors.transparent),
+                          left: BorderSide(width: 5, color: Colors.transparent),
+                          right:
+                              BorderSide(width: 5, color: Colors.transparent),
+                          bottom:
+                              BorderSide(width: 0, color: Colors.transparent))),
+                  child: buildMainContents()),
+            )));
+  }
+
+  Row buildMainContents() {
     final windowData = _data.rollingWindow.toList(growable: false);
-    return Scaffold(
-        body: SafeArea(
-      child: Container(
-          decoration: const BoxDecoration(
-              border: Border(
-                  top: BorderSide(width: 5, color: Colors.transparent),
-                  left: BorderSide(width: 5, color: Colors.transparent),
-                  right: BorderSide(width: 5, color: Colors.transparent),
-                  bottom: BorderSide(width: 0, color: Colors.transparent))),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(children: [
-                  Expanded(
-                      child: RollingChart<Data>(
-                          maxValue: 10,
-                          windowSize: _data.windowSize,
-                          data: windowData,
-                          dataSelector: (d) => d.v1)),
-                  Expanded(
-                      child: RollingChart<Data>(
-                          maxValue: 10,
-                          windowSize: _data.windowSize,
-                          data: windowData,
-                          dataSelector: (d) => d.v2)),
-                  Expanded(
-                      child: RollingChart<Data>(
-                          maxValue: 10,
-                          windowSize: _data.windowSize,
-                          data: windowData,
-                          dataSelector: (d) => d.v3)),
-                ]),
-              ),
-              Column(children: [
-                Text('THIS AREA TBD'),
-                Text('THIS AREA TBD'),
-                Text('THIS AREA TBD'),
-                Text('THIS AREA TBD'),
-              ])
-            ],
-          )),
-    ));
+    return Row(
+      children: [
+        Expanded(
+          child: Column(children: [
+            Expanded(
+                child: RollingChart<Data>(
+                    label: 'PRESSURE mbar',
+                    graphColor:
+                        charts.MaterialPalette.deepOrange.shadeDefault.lighter,
+                    maxValue: 10,
+                    windowSize: _data.windowSize,
+                    data: windowData,
+                    dataSelector: (d) => d.v1)),
+            Expanded(
+                child: RollingChart<Data>(
+                    label: 'FLOW l/s',
+                    graphColor:
+                        charts.MaterialPalette.green.shadeDefault.lighter,
+                    maxValue: 10,
+                    windowSize: _data.windowSize,
+                    data: windowData,
+                    dataSelector: (d) => d.v2)),
+            Expanded(
+                child: RollingChart<Data>(
+                    label: 'VOLUME ml',
+                    maxValue: 5,
+                    minValue: -5,
+                    windowSize: _data.windowSize,
+                    data: windowData,
+                    dataSelector: (d) => d.v3)),
+          ]),
+        ),
+        Center(
+          child: Column(children: [
+            Expanded(child: Row(
+              children: <Widget>[
+                Column(
+                  children: <Widget>[
+                    Expanded(child: ValueBox(value: 0, label: 'Ppeak', units: 'mbar')),
+                  ],
+                ),
+                Column(
+                  children: [
+                    Expanded(child: ValueBox(value: 0, label: 'PEEP')),
+                    Expanded(child: ValueBox(value: 0, label: 'Pmean'))
+                  ]
+                )
+              ],
+            )),
+            Expanded(child: Row(
+              children: <Widget>[
+                Column(
+                  children: <Widget>[
+                    Expanded(child: ValueBox(value: 0, label: 'RR', units: 'b/min')),
+                  ],
+                ),
+                Column(
+                  children: [
+                    Expanded(child: ValueBox(value: 0, label: 'Ti/Ttot')),
+                    Expanded(child: ValueBox(value: 0, label: 'O2 conc.'))
+                  ]
+                )
+              ],
+            )),
+            Expanded(child: Row(
+              children: <Widget>[
+                Column(
+                  children: <Widget>[
+                    Expanded(child: ValueBox(value: 0, label: 'VTo', units: 'ml')),
+                  ],
+                ),
+                Column(
+                  children: [
+                    Expanded(child: ValueBox(value: 0, label: 'VTi')),
+                    Expanded(child: ValueBox(value: 0, label: 'MVo'))
+                  ]
+                )
+              ],
+            )),
+          ]),
+        )
+      ],
+    );
   }
 }
 
-/// A rolling chart.  The X axis is time, from 0 to windowSize.  Numbers
-/// aren't given, and there's a 1/2 second black "gap" marking the current
-/// time.
-class RollingChart<D extends RollingDequeData> extends StatelessWidget {
-  final double _maxValue;
-  final double _windowSize;
-  final List<D> _data;
-  final double Function(D) _dataSelector;
-
-  /// [data] must be sorted by time.remainder(window size).
-  RollingChart(
-      {@required double maxValue,
-      @required double windowSize,
-      @required List<D> data,
-      @required double Function(D) dataSelector})
-      : this._maxValue = maxValue,
-        this._windowSize = windowSize,
-        this._data = data,
-        this._dataSelector = dataSelector;
-
-  @override
-  Widget build(BuildContext context) {
-    final numTicks = max(0, _windowSize.floor()) + 1;
-    final tickSpecs = List<charts.TickSpec<double>>(numTicks);
-    for (int i = 0; i < numTicks; i++) {
-      tickSpecs[i] = charts.TickSpec(i.toDouble(), label: '');
-    }
-    return charts.LineChart(<charts.Series<D, double>>[
-      charts.Series<D, double>(
-          id: 'set_scale', // Hack to keep Ymax constant
-          colorFn: (_, __) => charts.Color.transparent,
-          domainFn: (d, _) => 0,
-          measureFn: (d, _) => _maxValue,
-          data: [null]),
-      charts.Series<D, double>(
-          id: 'data',
-          colorFn: (d, __) {
-            final v = _dataSelector(d);
-            if (v == null) {
-              return charts.MaterialPalette.blue.shadeDefault;
-            } else if (v < 0.0 || v > _maxValue) {
-              return charts.MaterialPalette.red.shadeDefault;
-            } else {
-              return charts.MaterialPalette.blue.shadeDefault;
-            }
-          },
-          domainFn: (d, _) => d.time.remainder(_windowSize),
-          measureFn: (d, _) {
-            final v = _dataSelector(d);
-            if (v == null) {
-              return null;
-            } else if (v < 0.0) {
-              return 0.0;
-            } else if (v > _maxValue) {
-              return _maxValue;
-            } else {
-              return v;
-            }
-          },
-          data: _data)
-    ],
-        domainAxis: charts.NumericAxisSpec(
-            // Eventually, fill in to get thicker ticks:
-            //      renderSpec: charts.SmallTickRendererSpec<double>(),
-            tickProviderSpec: charts.StaticNumericTickProviderSpec(tickSpecs)),
-        animate: false);
-  }
-}
 
 // A temporary Data class.  The final program will have one instance for
 // each time value, and a selector function.
