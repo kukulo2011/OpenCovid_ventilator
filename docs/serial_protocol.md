@@ -8,12 +8,12 @@ protocol:  The controller just continuously sends updates.
 The protocol is a simple text-based protocol, with one data sample per line.
 Output from the controller looks like this:
 ```
-breezy,1,1234,270.3,3.5,87.3,-1
-breezy,1,1254,170.3,3.6,77.3,-1
-breezy,1,1275,70.3,4.2,67.3,-1
+breezy,1,44741, 0.00,21.13,66.33,  0.0, 0, 0, 0,  0, 0.00, 0.0, 0.0, 0.0,  0,  0,25370
+breezy,1,44795, 0.00,21.83,73.67,  0.0, 0, 0, 0,  0, 0.00, 0.0, 0.0, 0.0,  0,  0,26647
+breezy,1,44850, 0.00,23.30,81.33,  0.0, 0, 0, 0,  0, 0.00, 0.0, 0.0, 0.0,  0,  0, 3793
+breezy,1,44905, 0.00,23.47,89.00,  0.0, 0, 0, 0,  0, 0.00, 0.0, 0.0, 0.0,  0,  0,42439
+breezy,1,44959, 0.00,22.10,96.33,  0.0, 0, 0, 0,  0, 0.00, 0.0, 0.0, 0.0,  0,  0, 3932
 etc.
-TODO:  Fill in a real capture from the device, with 
-       the correct number of data values.
 ```
 It's a simple CSV (comma-separated values) text line, terminated by
 a carriage-return/line-feed.  Integers are represented as decimal
@@ -55,8 +55,6 @@ at the first character of `protocol_name` and ending with the comma
 before `checksum`. That final comma _is_ included in the checksum
 calculation. 
 
-___TODO:  Decide if this algorithm is OK.  If a different one is already
-available/implemented on the controller, that would probably be better.___
 The CRC algorithm is CRC-16-CCITT, as specified
 by [The CRC Wikipedia Page](https://en.wikipedia.org/wiki/Cyclic_redundancy_check).  Sample C code to calculate this can be found at
 http://srecord.sourceforge.net/crc16-ccitt.html.
