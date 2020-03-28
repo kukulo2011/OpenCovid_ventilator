@@ -28,9 +28,20 @@ The fields are as follows:
 | `protocol_name` | String | "breezy" | Allows extensibility to other devices. |
 | `protocol_version` | integer | 1 | Allows extensibility to future versions |
 | `time` | integer | 0-65535 | The time the sample was taken, in milliseconds.  The time value wraps when it overflows. |
-| `value1` | float |  ???  |  ???  |
-| `value2` | float |  ???  |  ???  |
-| `value3` | float |  ???  |  ???  |
+| `cmH2O` | float |  ???  |  Actual pressure (to be plotted)  |
+| `l/min` | float |  ???  |  Actual flow (to be plotted) |
+| `ml` | float |  ???  |  Actual volume (to be plotted) |
+| `Ppeak (cmH2O)` | float |  ???  |  Peak pressure  |
+| `Pmean (cmH2O)` | float |  ???  |  Mean pressure  |
+| `PEEP (cmH2O)` | float |  ???  |  Positive end-expiratory pressure  |
+| `RR` | float |  ???  |  Respiratory rate (b/min)  |
+| `O2 (%)` | float |  ???  |  Oxygen concentration  |
+| `Ti (s)` | float |  ???  |  Inspiration time  |
+| `I:E` | float |  ???  |  Inspiration : Expiration ratio, print as 1:???  |
+| `MVi (l/min)` | float |  ???  |  Mean volume inspiration  |
+| `MVe (l/min)` | float |  ???  |  Mean volume expiration  |
+| `VTi (ml)` | float |  ???  |  Volume tidal inspiration  |
+| `VTe (ml)` | float |  ???  |  Volume tidal expiration  |
 | `checksum` | int |  0-65535 or -1 | A value of -1 means "no checksum" |
 
 The time value wraps.  For example, if samples arrive every 20ms, 
