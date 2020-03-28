@@ -8,7 +8,7 @@ Sensors sensors;
 
 void setup() {
   
-  Serial.begin(9600);  // start serial for output
+  Serial.begin(115200);  // start serial for output
 
   Serial.println("MCU_RESET");
 
