@@ -4,7 +4,13 @@ The pneumatic and mechanic schematic for the ventilator is not yet finished, but
 
 ## Hardware
 
-We plan using RAMPS 1.4 board and the RepRapDiscount Full Graphic Smart Controller. The board has 3 power FET's that can be used to control the blower RPM and solenoid valves. The stepper drivers may be used to drive steppers in precision valves. 
+We plan using RAMPS 1.4 board along with Arduino Mega and the RepRapDiscount Full Graphic Smart Controller. The board has 3 power FET's that can be used to control the blower RPM and solenoid valves. The stepper drivers may be used to drive steppers in precision valves. 
+The LCD will show basic quantities and enable setting some (not so often used) parameters.
+To control the main ventilator parameteres, there wil be several potentiometers on the panel (TBD) allowing fast and easy control.
+The on-line charts of pressure, flow and volume will be available via [Android app](../display_app).
+
+## Installation
+Use Arduino IDE. Open Breezy.ino to compile the code and flash the Arduino Mega. No need to add any libraries. To use the app, connect the usb cable to your phone/tablet with the app installed.
 
 ### Sensors
 
