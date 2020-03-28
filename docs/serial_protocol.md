@@ -1,6 +1,6 @@
 # Breezy Serial Protocol
 To communicate between the 8-bit ventilator controller and the Android
-app, we use a 9600 baud serial connection over the USB port.  The Android
+app, we use a 115200 baud serial connection over the USB port.  The Android
 app does not control the ventilator, because manipulating a touchscreen while
 wearing gloves is not suitable.  For this reason, it's a one-directional
 protocol:  The controller just continuously sends updates.
@@ -43,6 +43,7 @@ The fields are as follows:
 | `VTi (ml)` | float |  ???  |  Volume tidal inspiration  |
 | `VTe (ml)` | float |  ???  |  Volume tidal expiration  |
 | `checksum` | int |  0-65535 or -1 | A value of -1 means "no checksum" |
+| `line end` | String | "\r\n" | End of message |
 
 The time value wraps.  For example, if samples arrive every 20ms, 
 the sample at time 65532 would be followed by a sample at time 16.  Note
