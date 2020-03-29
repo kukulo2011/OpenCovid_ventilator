@@ -40,16 +40,15 @@ class ValueBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+        constraints: BoxConstraints.expand(),
         decoration: BoxDecoration(
             border: Border(
                 top: BorderSide(width: 1, color: _borderColor),
-                left: BorderSide(width: 1, color: _borderColor),
-                right: BorderSide(width: 1, color: _borderColor),
-                bottom: BorderSide(width: 1, color: _borderColor))),
+                left: BorderSide(width: 1, color: _borderColor))),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            SizedBox(width: 200, height: 10),
+            SizedBox(height: 10),
             Container(
               margin: EdgeInsets.only(left: 5),
               child: Text(label)),

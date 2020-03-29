@@ -53,6 +53,7 @@ class _GraphsScreenState extends State<GraphsScreen> {
       RollingDeque(500, 10, 0.5, (double time) => Data(time, null, null, null));
   static final _random = Random();
   static Timer _timer;
+  static final _borderColor = Colors.grey[700];
 
   @override
   void initState() {
@@ -89,13 +90,18 @@ class _GraphsScreenState extends State<GraphsScreen> {
               child: Container(
                   decoration: const BoxDecoration(
                       border: Border(
-                          top: BorderSide(width: 5, color: Colors.transparent),
-                          left: BorderSide(width: 5, color: Colors.transparent),
+                          top: BorderSide(width: 2, color: Colors.transparent),
+                          left: BorderSide(width: 2, color: Colors.transparent),
                           right:
-                              BorderSide(width: 5, color: Colors.transparent),
+                              BorderSide(width: 2, color: Colors.transparent),
                           bottom:
-                              BorderSide(width: 0, color: Colors.transparent))),
-                  child: buildMainContents()),
+                              BorderSide(width: 2, color: Colors.transparent))),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        right: BorderSide(width: 1, color: _borderColor),
+                        bottom: BorderSide(width: 1, color: _borderColor))),
+                    child: buildMainContents())),
             )));
   }
 
@@ -104,6 +110,7 @@ class _GraphsScreenState extends State<GraphsScreen> {
     return Row(
       children: [
         Expanded(
+          flex: 7,
           child: Column(children: [
             Expanded(
                 child: RollingChart<Data>(
@@ -133,50 +140,65 @@ class _GraphsScreenState extends State<GraphsScreen> {
                     dataSelector: (d) => d.v3)),
           ]),
         ),
-        Center(
+        Expanded(
+          flex: 3,
           child: Column(children: [
             Expanded(child: Row(
               children: <Widget>[
-                Column(
-                  children: <Widget>[
-                    Expanded(child: ValueBox(value: 0, label: 'Ppeak', units: 'mbar')),
-                  ],
+                Expanded(
+                  child: Column(
+                    children: <Widget>[
+                      Expanded(child: ValueBox(value: 0, label: 'Ppeak', units: 'mbar')),
+                    ],
+                  ),
                 ),
-                Column(
-                  children: [
-                    Expanded(child: ValueBox(value: 0, label: 'PEEP')),
-                    Expanded(child: ValueBox(value: 0, label: 'Pmean'))
-                  ]
+                Expanded(
+                  child: Column(
+                    children: [
+                      Expanded(child: ValueBox(value: 0, label: 'PEEP')),
+                      Expanded(child: ValueBox(value: 0, label: 'Pmean'))
+                    ]
+                  ),
                 )
               ],
             )),
             Expanded(child: Row(
               children: <Widget>[
-                Column(
-                  children: <Widget>[
-                    Expanded(child: ValueBox(value: 0, label: 'RR', units: 'b/min')),
-                  ],
+                Expanded(
+                  child: Column(
+                    children: <Widget>[
+                      Expanded(child: ValueBox(value: 0, label: 'RR', units: 'b/min')),
+                      Expanded(child: ValueBox(value: 0, label: 'O2', units: '%')),
+                    ],
+                  ),
                 ),
-                Column(
-                  children: [
-                    Expanded(child: ValueBox(value: 0, label: 'Ti/Ttot')),
-                    Expanded(child: ValueBox(value: 0, label: 'O2 conc.'))
-                  ]
+                Expanded(
+                  child: Column(
+                    children: [
+                      Expanded(child: ValueBox(value: 0, label: 'Ti')),
+                      Expanded(child: ValueBox(value: 0, label: 'I:E'))
+                    ]
+                  ),
                 )
               ],
             )),
             Expanded(child: Row(
               children: <Widget>[
-                Column(
-                  children: <Widget>[
-                    Expanded(child: ValueBox(value: 0, label: 'VTo', units: 'ml')),
-                  ],
+                Expanded(
+                  child: Column(
+                    children: <Widget>[
+                      Expanded(child: ValueBox(value: 0, label: 'MVi', units: 'l/min')),
+                      Expanded(child: ValueBox(value: 0, label: 'MVe', units: 'l/min')),
+                    ],
+                  ),
                 ),
-                Column(
-                  children: [
-                    Expanded(child: ValueBox(value: 0, label: 'VTi')),
-                    Expanded(child: ValueBox(value: 0, label: 'MVo'))
-                  ]
+                Expanded(
+                  child: Column(
+                    children: [
+                      Expanded(child: ValueBox(value: 0, label: 'VTi', units: 'ml')),
+                      Expanded(child: ValueBox(value: 0, label: 'VTe', units: 'ml'))
+                    ]
+                  ),
                 )
               ],
             )),

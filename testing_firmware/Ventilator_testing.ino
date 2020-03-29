@@ -16,7 +16,6 @@ float O2conc=35;
 float VTo=1254.21;
 float VTi=1245;
 float MVo=1100;
-int timeb=0;
  
 void setup() {
   Serial.begin(115200);
@@ -25,7 +24,7 @@ void setup() {
 }
 void loop() {
   Serial.print("breezy,1,");
-  Serial.print(timeb, 1);
+  Serial.print(millis(), 1);
   Serial.print(","); 
   Serial.print(volume, 1);
   Serial.print(","); 
@@ -55,6 +54,6 @@ void loop() {
   Serial.print(",");
   Serial.print("-1"); 
   Serial.println();
-  timeb=timeb+1;
+  delay(50);
     
 }
