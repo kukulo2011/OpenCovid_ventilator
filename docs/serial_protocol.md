@@ -28,20 +28,20 @@ The fields are as follows:
 | `protocol_name` | String | "breezy" | Allows extensibility to other devices. |
 | `protocol_version` | integer | 1 | Allows extensibility to future versions |
 | `time` | integer | 0-65535 | The time the sample was taken, in milliseconds.  The time value wraps when it overflows. |
-| `cmH2O` | float |  ???  |  Actual pressure (to be plotted)  |
-| `l/min` | float |  ???  |  Actual flow (to be plotted) |
-| `ml` | float |  ???  |  Actual volume (to be plotted) |
-| `Ppeak (cmH2O)` | float |  ???  |  Peak pressure  |
-| `Pmean (cmH2O)` | float |  ???  |  Mean pressure  |
-| `PEEP (cmH2O)` | float |  ???  |  Positive end-expiratory pressure  |
-| `RR` | float |  ???  |  Respiratory rate (b/min)  |
+| `cmH2O` | float |  -99 to 99  |  Actual pressure (to be plotted)  |
+| `l/min` | float |  -999 to 999  |  Actual flow (to be plotted) |
+| `ml` | float |  0 to 9999  |  Actual volume (to be plotted) |
+| `Ppeak (cmH2O)` | float | 0 to 99 |  Peak pressure  |
+| `Pmean (cmH2O)` | float | 0 to 99 |  Mean pressure  |
+| `PEEP (cmH2O)` | float | 0 to 99 |  Positive end-expiratory pressure  |
+| `RR` | float | 0 to 99 |  Respiratory rate (b/min)  |
 | `O2 (%)` | float |  0-100 |  Oxygen concentration  |
-| `Ti (s)` | float |  ???  |  Inspiration time  |
-| `I:E` | float |  ???  |  Inspiration : Expiration ratio, print as 1:???  |
-| `MVi (l/min)` | float |  ???  |  Mean volume inspiration  |
-| `MVe (l/min)` | float |  ???  |  Mean volume expiration  |
-| `VTi (ml)` | float |  ???  |  Volume tidal inspiration  |
-| `VTe (ml)` | float |  ???  |  Volume tidal expiration  |
+| `Ti (s)` | float |  0 to 99 |  Inspiration time  |
+| `I:E` | float | 0 to 99 |  Inspiration : Expiration ratio, print as 1:???  |
+| `MVi (l/min)` | float | 0 to 99 |  Mean volume inspiration  |
+| `MVe (l/min)` | float | 0 to 99 |  Mean volume expiration  |
+| `VTi (ml)` | float | 0 to 9999 |  Volume tidal inspiration  |
+| `VTe (ml)` | float | 0 to 9999 |  Volume tidal expiration  |
 | `checksum` | int |  0-65535 or -1 | A value of -1 means "no checksum" |
 | `line end` | String | "\r\n" | End of message |
 
