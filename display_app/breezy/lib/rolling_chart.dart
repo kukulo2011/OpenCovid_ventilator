@@ -75,9 +75,7 @@ class RollingChart<D extends RollingDequeData> extends StatelessWidget {
         decoration: BoxDecoration(
             border: Border(
                 top: BorderSide(width: 1, color: _borderColor),
-                left: BorderSide(width: 1, color: _borderColor),
-                right: BorderSide(width: 1, color: _borderColor),
-                bottom: BorderSide(width: 1, color: _borderColor))),
+                left: BorderSide(width: 1, color: _borderColor))),
         child: Stack(
           children: <Widget>[
             Row(children: [
