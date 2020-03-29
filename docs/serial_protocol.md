@@ -23,7 +23,7 @@ https://api.flutter.dev/flutter/dart-core/double/parse.html.
 
 The fields are as follows:
 
-|   Field Name  |  Type  | Value/Range |  Comment  |
+|   Field Name  |  Type  | Value/Expected Range |  Comment  |
 |---------------|--------|-------|-----------|
 | `protocol_name` | String | "breezy" | Allows extensibility to other devices. |
 | `protocol_version` | integer | 1 | Allows extensibility to future versions |
