@@ -19,6 +19,7 @@ void loop() {
 
   sensors.measure();
   sensors.print_msg();
+  sensors.print_service_msg();
   
   delay(50);
 }

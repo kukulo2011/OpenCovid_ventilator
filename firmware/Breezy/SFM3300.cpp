@@ -19,6 +19,8 @@ uint8_t SFM3300::init()
   SFM3300_POWER_ON();
   delay(110);
 
+  // TODO try to remove delays.. In real application it is not acceptable!
+
   slm_sum_raw = 0;
   slm_sum = 0;
   uint8_t ret = 0;
@@ -37,7 +39,7 @@ uint8_t SFM3300::measure()
   if(ret == 0){
     f_raw = (data[0] << 8);
     f_raw |= data[1];
-    uint8_t crc = data[2];
+    uint8_t crc = data[2]; // TODO check CRC
     slm = (((float)f_raw) - 32768)/120;
     slm_sum_raw += ((long int)f_raw)-32768;
     slm_sum = slm_sum_raw / 120;

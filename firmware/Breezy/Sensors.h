@@ -1,5 +1,6 @@
 
 
+
 class Sensors{
   public:
   float p_act; // actual pressure (cmH2O)
@@ -16,12 +17,16 @@ class Sensors{
   float mve; // mean volume expiration (l/min)
   float vti; // volume tidal inspiration (ml)
   float vte; // volume tidal expiration (ml)
+
+  float p_o2; // O2 supply pressure
   
   uint8_t measure(void);
   uint8_t print_msg(void);
+  uint8_t print_service_msg(void);
   void init(void);
 
-
+  private:
+  float AnalogSensor(float MinVolt, float MaxVolt, float MinOutp, float MaxOutp, const uint8_t pin);
   
 };
 
