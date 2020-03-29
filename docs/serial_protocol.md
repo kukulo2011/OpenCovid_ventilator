@@ -23,7 +23,7 @@ https://api.flutter.dev/flutter/dart-core/double/parse.html.
 
 The fields are as follows:
 
-|   Field Name  |  Type  | Value/Expected Range |  Comment  |
+|   Field Name  |  Type  | Expected Range |  Comment  |
 |---------------|--------|-------|-----------|
 | `protocol_name` | String | "breezy" | Allows extensibility to other devices. |
 | `protocol_version` | integer | 1 | Allows extensibility to future versions |
@@ -35,7 +35,7 @@ The fields are as follows:
 | `Pmean (cmH2O)` | float |  ???  |  Mean pressure  |
 | `PEEP (cmH2O)` | float |  ???  |  Positive end-expiratory pressure  |
 | `RR` | float |  ???  |  Respiratory rate (b/min)  |
-| `O2 (%)` | float |  ???  |  Oxygen concentration  |
+| `O2 (%)` | float |  0-100 |  Oxygen concentration  |
 | `Ti (s)` | float |  ???  |  Inspiration time  |
 | `I:E` | float |  ???  |  Inspiration : Expiration ratio, print as 1:???  |
 | `MVi (l/min)` | float |  ???  |  Mean volume inspiration  |
@@ -49,6 +49,13 @@ The time value wraps.  For example, if samples arrive every 20ms,
 the sample at time 65532 would be followed by a sample at time 16.  Note
 that if a few samples are missed, the time will remain synchronized.  This
 would not be true if only time deltas were sent.
+
+The expected range is the set of expected values.  For the measured
+quantities, actual values can go outside of this range, but if
+they do, the line graph might clamp the value and color it
+red.  For values displayed as numbers, values outside of the
+expected range might have formatting issues if more digits are
+required.
 
 The checksum is calculated over the ASCII character values starting
 at the first character of `protocol_name` and ending with the comma
