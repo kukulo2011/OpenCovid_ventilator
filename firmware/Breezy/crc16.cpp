@@ -1,3 +1,13 @@
+/* Code to calculate CRC16-CCITT
+ * was adopted from the following site
+ * http://srecord.sourceforge.net/crc16-ccitt.html
+ * 
+ */
+
+
+
+
+
 #include "crc16.h"
 
 #define           poly     0x1021          /* crc-ccitt mask */
