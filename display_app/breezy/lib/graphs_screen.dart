@@ -1,5 +1,3 @@
-import 'dart:math';
-import 'dart:async' show Timer;
 import 'package:flutter/material.dart';
 import 'package:charts_flutter/flutter.dart' as charts;
 import 'package:screen/screen.dart' show Screen;
@@ -7,6 +5,7 @@ import 'package:pedantic/pedantic.dart';
 import 'rolling_chart.dart';
 import 'rolling_deque.dart';
 import 'value_box.dart';
+import 'read_device.dart';
 
 /*
 MIT License
@@ -32,6 +31,51 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
+const _graphLabels = [
+  _GraphSelector('PRESSURE mbar', -100.0, 100.0, 0),
+  _GraphSelector('FLOW l/min', -100.0, 100.0, 1),
+  // TODO:  Spec says -999 to 999, but the sample data is different.
+  _GraphSelector('VOLUME ml', -500.0, 500.0, 2),
+  // TODO:  Spec claims volum is 0..9999, but the sample data is nowhere
+  //        near that.  And ten liters of air is a lot!
+];
+
+const _displayedValues = [
+  _DisplayedValueSelector('Ppeak', 'mbar', 0),
+  _DisplayedValueSelector('Pmean', 'mbar', 1),
+  _DisplayedValueSelector('PEEP', 'mbar', 2),
+  _DisplayedValueSelector('RR', 'b/min', 3),
+  _DisplayedValueSelector('O2', '%', 4),
+  _DisplayedValueSelector('Ti', 's', 5),
+  _DisplayedValueSelector('I:E', '', 6),
+  _DisplayedValueSelector('MVi', 'l/min', 7),
+  _DisplayedValueSelector('MVe', 'l/min', 8),
+  _DisplayedValueSelector('VTi', '', 9),
+  _DisplayedValueSelector('VTe', 'ml', 10)
+];
+
+class _GraphSelector implements RollingChartSelector<DeviceData> {
+  @override
+  final String label;
+  @override
+  final double minValue;
+  @override
+  final double maxValue;
+  final int _index;
+
+  const _GraphSelector(this.label, this.minValue, this.maxValue, this._index);
+
+  @override
+  double getValue(DeviceData data) => data.chartedValues?.elementAt(_index);
+}
+
+class _DisplayedValueSelector {
+  final String label;
+  final String units;
+  final int index;
+  const _DisplayedValueSelector(this.label, this.units, this.index);
+}
+
 ///
 /// The screen where all the fancy graphs are shown.  This is the primary
 /// screen for this app.
@@ -41,43 +85,41 @@ SOFTWARE.
 /// try to optimize display if only part of the screen changes.
 ///
 class GraphsScreen extends StatefulWidget {
-  GraphsScreen({Key key}) : super(key: key);
+  final DeviceDataSource _dataSource;
+
+  GraphsScreen({Key key, @required DeviceDataSource dataSource}) :
+      this._dataSource=dataSource, super(key: key);
 
   @override
-  _GraphsScreenState createState() => _GraphsScreenState();
+  _GraphsScreenState createState() => _GraphsScreenState(_dataSource);
 }
 
-class _GraphsScreenState extends State<GraphsScreen> {
-  double _currTime = 0;
+class _GraphsScreenState extends State<GraphsScreen>
+    implements DeviceDataListener {
+  final DeviceDataSource _dataSource;
   final _data =
-      RollingDeque(500, 10, 0.5, (double time) => Data(time, null, null, null));
-  static final _random = Random();
-  static Timer _timer;
+      RollingDeque(500, 10, 0.5, (double time) => DeviceData.dummy(time));
   static final _borderColor = Colors.grey[700];
+
+  _GraphsScreenState(this._dataSource);
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(Duration(milliseconds: 20), (_) => _tick());
+    _dataSource.start(this);
     unawaited(Screen.keepOn(true));
   }
 
   @override
   void dispose() {
     super.dispose();
-    _timer.cancel();
+    _dataSource.stop();
     unawaited(Screen.keepOn(false));
   }
 
-  void _tick() {
-    final frobbed = _currTime.remainder(3.7);
-    final double v1 = _random.nextDouble() * 0.5 + (frobbed < 1.5 ? 1.0 : 7.0);
-    final double v2 = (frobbed < 1.5 ? frobbed * 5 : 2.0);
-    final double v3 = 6 * sin(_currTime); // Some out of range
-    setState(() {
-      _data.append(Data(_currTime, v1, v2, v3));
-    });
-    _currTime += 0.020;
+  @override
+  void processDeviceData(DeviceData d) {
+    setState(() => _data.append(d));
   }
 
   @override
@@ -97,108 +139,122 @@ class _GraphsScreenState extends State<GraphsScreen> {
                           bottom:
                               BorderSide(width: 2, color: Colors.transparent))),
                   child: Container(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        right: BorderSide(width: 1, color: _borderColor),
-                        bottom: BorderSide(width: 1, color: _borderColor))),
-                    child: buildMainContents())),
+                      decoration: BoxDecoration(
+                          border: Border(
+                              right: BorderSide(width: 1, color: _borderColor),
+                              bottom:
+                                  BorderSide(width: 1, color: _borderColor))),
+                      child: buildMainContents())),
             )));
   }
 
   Row buildMainContents() {
-    final windowData = _data.rollingWindow.toList(growable: false);
+    final windowData = _data.rollingWindow;
+    final current = _data.current;
     return Row(
       children: [
         Expanded(
           flex: 7,
           child: Column(children: [
             Expanded(
-                child: RollingChart<Data>(
-                    label: 'PRESSURE mbar',
+                child: RollingChart<DeviceData>(
+                    selector: _graphLabels[0],
                     graphColor:
                         charts.MaterialPalette.deepOrange.shadeDefault.lighter,
-                    maxValue: 10,
                     windowSize: _data.windowSize,
-                    data: windowData,
-                    dataSelector: (d) => d.v1)),
+                    data: windowData)),
             Expanded(
-                child: RollingChart<Data>(
-                    label: 'FLOW l/s',
+                child: RollingChart<DeviceData>(
+                    selector: _graphLabels[1],
                     graphColor:
                         charts.MaterialPalette.green.shadeDefault.lighter,
-                    maxValue: 10,
                     windowSize: _data.windowSize,
-                    data: windowData,
-                    dataSelector: (d) => d.v2)),
+                    data: windowData)),
             Expanded(
-                child: RollingChart<Data>(
-                    label: 'VOLUME ml',
-                    maxValue: 5,
-                    minValue: -5,
+                child: RollingChart<DeviceData>(
+                    selector: _graphLabels[2],
                     windowSize: _data.windowSize,
-                    data: windowData,
-                    dataSelector: (d) => d.v3)),
+                    data: windowData)),
           ]),
         ),
         Expanded(
           flex: 3,
           child: Column(children: [
-            Expanded(child: Row(
+            Expanded(
+                child: Row(
               children: <Widget>[
                 Expanded(
                   child: Column(
                     children: <Widget>[
-                      Expanded(child: ValueBox(value: 0, label: 'Ppeak', units: 'mbar')),
+                      Expanded(
+                          child: _DisplayedValueBox(
+                              selector: _displayedValues[0], data: current)),
                     ],
                   ),
                 ),
                 Expanded(
-                  child: Column(
-                    children: [
-                      Expanded(child: ValueBox(value: 0, label: 'PEEP')),
-                      Expanded(child: ValueBox(value: 0, label: 'Pmean'))
-                    ]
-                  ),
+                  child: Column(children: [
+                    Expanded(
+                        child: _DisplayedValueBox(
+                            selector: _displayedValues[2], data: current)),
+                    Expanded(
+                        child: _DisplayedValueBox(
+                            selector: _displayedValues[1], data: current)),
+                  ]),
                 )
               ],
             )),
-            Expanded(child: Row(
+            Expanded(
+                child: Row(
               children: <Widget>[
                 Expanded(
                   child: Column(
                     children: <Widget>[
-                      Expanded(child: ValueBox(value: 0, label: 'RR', units: 'b/min')),
-                      Expanded(child: ValueBox(value: 0, label: 'O2', units: '%')),
+                      Expanded(
+                          child: _DisplayedValueBox(
+                              selector: _displayedValues[3], data: current)),
+                      Expanded(
+                          child: _DisplayedValueBox(
+                              selector: _displayedValues[4], data: current)),
                     ],
                   ),
                 ),
                 Expanded(
-                  child: Column(
-                    children: [
-                      Expanded(child: ValueBox(value: 0, label: 'Ti')),
-                      Expanded(child: ValueBox(value: 0, label: 'I:E'))
-                    ]
-                  ),
+                  child: Column(children: [
+                    Expanded(
+                        child: _DisplayedValueBox(
+                            selector: _displayedValues[5], data: current)),
+                    Expanded(
+                        child: _DisplayedValueBox(
+                            selector: _displayedValues[6], data: current)),
+                  ]),
                 )
               ],
             )),
-            Expanded(child: Row(
+            Expanded(
+                child: Row(
               children: <Widget>[
                 Expanded(
                   child: Column(
                     children: <Widget>[
-                      Expanded(child: ValueBox(value: 0, label: 'MVi', units: 'l/min')),
-                      Expanded(child: ValueBox(value: 0, label: 'MVe', units: 'l/min')),
+                      Expanded(
+                          child: _DisplayedValueBox(
+                              selector: _displayedValues[7], data: current)),
+                      Expanded(
+                          child: _DisplayedValueBox(
+                              selector: _displayedValues[8], data: current)),
                     ],
                   ),
                 ),
                 Expanded(
-                  child: Column(
-                    children: [
-                      Expanded(child: ValueBox(value: 0, label: 'VTi', units: 'ml')),
-                      Expanded(child: ValueBox(value: 0, label: 'VTe', units: 'ml'))
-                    ]
-                  ),
+                  child: Column(children: [
+                    Expanded(
+                        child: _DisplayedValueBox(
+                          selector: _displayedValues[9], data: current)),
+                    Expanded(
+                        child: _DisplayedValueBox(
+                          selector: _displayedValues[10], data: current)),
+                  ]),
                 )
               ],
             )),
@@ -209,15 +265,10 @@ class _GraphsScreenState extends State<GraphsScreen> {
   }
 }
 
-
-// A temporary Data class.  The final program will have one instance for
-// each time value, and a selector function.
-class Data implements RollingDequeData {
-  @override
-  final double time;
-  final double v1;
-  final double v2;
-  final double v3;
-
-  Data(this.time, this.v1, this.v2, this.v3);
+class _DisplayedValueBox extends ValueBox {
+  _DisplayedValueBox({_DisplayedValueSelector selector, DeviceData data})
+      : super(
+            value: data?.displayedValues?.elementAt(selector.index),
+            label: selector.label,
+            units: selector.units);
 }

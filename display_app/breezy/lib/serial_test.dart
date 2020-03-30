@@ -66,14 +66,20 @@ class _SerialTestPageState extends State<SerialTestPage> {
     }
     await port.setDTR(true);
     await port.setRTS(true);
-    await port.setPortParameters(9600, UsbPort.DATABITS_8, UsbPort.STOPBITS_1,
+    await port.setPortParameters(115200, UsbPort.DATABITS_8, UsbPort.STOPBITS_1,
       UsbPort.PARITY_NONE);
-    port.inputStream.listen((Uint8List event) {
+    port.inputStream.listen((Uint8List event) async {
       final b = StringBuffer();
       for (final ch in event) {
         b.writeCharCode(ch);
       }
       _print(b.toString());
+      // If the serial input is coming faster than the Android hardware can
+      // handle, the following line should let the display task in often
+      // enough to see some screen updates.  In production, data should never
+      // come continuously and at full speed, because there's only one value
+      // every 20ms.
+      await Future.delayed(Duration(milliseconds: 1), () => null);
     });
   }
 

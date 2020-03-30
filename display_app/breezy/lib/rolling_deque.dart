@@ -36,7 +36,7 @@ SOFTWARE.
 ///
 /// This class uses assertions to validate that out-of-order elements are
 /// not added.
-class RollingDeque<T extends RollingDequeData> {
+class RollingDeque<T extends TimedData> {
   final List<T> _list;
   final double windowSize; // In the same units as RollingDequeData.time
   final double _gapSize;
@@ -44,6 +44,7 @@ class RollingDeque<T extends RollingDequeData> {
   int length = 1;
   int _firstIndex = 0;
   int _minElementIndex = 0; // Index into RollingDeque, not _list.
+  List<T> _rollingWindow;
 
   RollingDeque(
       int maxElements, this.windowSize, this._gapSize, this._dummyFactory)
@@ -53,9 +54,10 @@ class RollingDeque<T extends RollingDequeData> {
 
   /// Append e to the list, while enforcing the window size and gap.
   void append(T e) {
-    assert(length == 1 || this[length - 2].time < e.time);
-    double earliestValid = e.time - (windowSize - _gapSize);
-    while (length > 1 && this[0].time < earliestValid) {
+    _rollingWindow = null; // Invalidate cached value
+    assert(length == 1 || this[length - 2].timeMS < e.timeMS);
+    double earliestValid = e.timeMS - (windowSize - _gapSize);
+    while (length > 1 && this[0].timeMS < earliestValid) {
       _list[_firstIndex++] = null;
       _firstIndex %= _list.length;
       length--;
@@ -65,16 +67,16 @@ class RollingDeque<T extends RollingDequeData> {
     }
     _list[(_firstIndex + length - 1) % _list.length] = e; // old dummy
     assert(identical(last, e));
-    if (this[_minElementIndex].time.remainder(windowSize) >
-        e.time.remainder(windowSize)) {
+    if (this[_minElementIndex].timeMS.remainder(windowSize) >
+        e.timeMS.remainder(windowSize)) {
       _minElementIndex = length - 1;
     }
     assert(length < _list.length);
-    T dummy = _dummyFactory(e.time + _gapSize / 2.0);
+    T dummy = _dummyFactory(e.timeMS + _gapSize / 2.0);
     _list[(_firstIndex + length++) % _list.length] = dummy;
     assert(identical(last, dummy));
-    if (this[_minElementIndex].time.remainder(windowSize) >
-        dummy.time.remainder(windowSize)) {
+    if (this[_minElementIndex].timeMS.remainder(windowSize) >
+        dummy.timeMS.remainder(windowSize)) {
       _minElementIndex = length - 1;
     }
   }
@@ -89,15 +91,31 @@ class RollingDeque<T extends RollingDequeData> {
     return _list[(_firstIndex + index) % _list.length];
   }
 
+  /// Give the current valid value.  This is the second-to-last value
+  /// on the list, since the last value is a dummy value.
+  T get current {
+    if (length < 2) {
+      return null;
+    } else {
+      return this[length-2];
+    }
+  }
+
   /// Give a view of the data within the window needed by a rolling display.
   /// In other words, give a view sorted by time.remainder(windowSize).
-  Iterable<T> get rollingWindow {
-    return _RollingDequeWindowIterable(this, _minElementIndex);
+  List<T> get rollingWindow {
+    _rollingWindow ??= _RollingDequeWindowIterable(this, _minElementIndex)
+        .toList(growable: false);
+    return _rollingWindow;
   }
 }
 
-class _RollingDequeWindowIterable<T extends RollingDequeData>
-    extends IterableBase<T> {
+abstract class TimedData {
+  /// Time in milliseconds
+  double get timeMS;
+}
+
+class _RollingDequeWindowIterable<T extends TimedData> extends IterableBase<T> {
   final RollingDeque<T> _deque;
   final int _startIndex;
 
@@ -107,13 +125,7 @@ class _RollingDequeWindowIterable<T extends RollingDequeData>
   Iterator<T> get iterator => _RollingDequeWindowIterator(this);
 }
 
-abstract class RollingDequeData {
-
-  double get time;
-
-}
-
-class _RollingDequeWindowIterator<T extends RollingDequeData> implements Iterator<T> {
+class _RollingDequeWindowIterator<T extends TimedData> implements Iterator<T> {
   final _RollingDequeWindowIterable<T> _di;
   int _currIndex = -1;
 

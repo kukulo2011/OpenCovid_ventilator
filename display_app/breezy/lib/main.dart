@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'dart:io' show exit;
+import 'dart:io' show exit, stdout;
 import 'serial_test.dart';
 import 'graphs_screen.dart';
+import 'read_device.dart';
 
 /*
 MIT License
@@ -28,6 +29,12 @@ SOFTWARE.
  */
 
 void main() => runApp(MyApp());
+
+class Log {
+  // TODO:  Send this to an internal buffer, so we can access it from a menu
+  static void writeln([Object o = '']) => stdout.writeln(o);
+  static void write(Object o) => stdout.write(o);
+}
 
 class MyApp extends StatelessWidget {
   // This widget is the root of your application.
@@ -76,7 +83,12 @@ class BreezyHomePage extends StatelessWidget {
             child: const Text('Show Fake Graphs', style: bigTextStyle),
             onPressed: () {
               Navigator.push<void>(context,
-              MaterialPageRoute(builder: (context) => GraphsScreen()));
+              MaterialPageRoute(builder: (context) => GraphsScreen(
+                // dataSource: DeviceDataSource.screenDebug()
+                dataSource: DeviceDataSource.fromAssetFile(
+                  DefaultAssetBundle.of(context), "assets/demo.log"
+                )
+              )));
             }),
         ])));
   }
