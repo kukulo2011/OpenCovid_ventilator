@@ -344,14 +344,14 @@ m2=values\n0..n</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>410</x>
+      <x>390</x>
       <y>160</y>
-      <w>100</w>
-      <h>100</h>
+      <w>120</w>
+      <h>110</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;&lt;&lt;&lt;-
-m2=content\n1</panel_attributes>
-    <additional_attributes>20.0;10.0;20.0;60.0;80.0;60.0</additional_attributes>
+m2=portrait,\nlandscape\n1..2</panel_attributes>
+    <additional_attributes>40.0;10.0;40.0;60.0;100.0;60.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>

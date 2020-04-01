@@ -88,17 +88,21 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
   static final int _cr = '\r'.codeUnitAt(0);
   static final int _newline = '\n'.codeUnitAt(0);
   static final int _hash = '#'.codeUnitAt(0);
-  final bool _meterReading;
+  final bool _meterData;
   final _lineBuffer = StringBuffer();
   int _lastTime; // Starts out null
   int _currTime = 0; // 64 bits
   bool _stopped = false;
+  DateTime _startTime;
 
-  _ByteStreamDataSource(this._meterReading);
+  _ByteStreamDataSource(this._meterData);
 
   @override
   start(DeviceDataListener listener) {
     super.start(listener);
+    if (_meterData) {
+      _startTime = DateTime.now();
+    }
     _stopped = false;
     unawaited(readUntilStopped());
   }
@@ -109,6 +113,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
   void stop() {
     super.stop();
     _stopped = true;
+    _startTime = null;
   }
 
   Future<void> receive(Uint8List data) async {
@@ -159,9 +164,14 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
             throw Exception('bad deltaT:  $deltaT <= 0');
           }
           _currTime += deltaT;
-          if (_meterReading) {
-            waited = true;
-            await Future.delayed(Duration(milliseconds: deltaT), () => null);
+          if (_meterData) {
+            int now =
+                DateTime.now().difference(_startTime).inMilliseconds;
+            int dNow= _currTime - now;
+            if (dNow > 0) {
+              waited = true;
+              await Future.delayed(Duration(milliseconds: dNow), () => null);
+            }
           }
         }
         _lastTime = time;
