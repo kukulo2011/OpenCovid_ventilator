@@ -1,7 +1,7 @@
 name: breezy
 description: Breezy - Emergency Ventilator Display
 
-version: 0.0.6
+version: 0.0.7
 
 environment:
   sdk: ">=2.1.0 <3.0.0"
