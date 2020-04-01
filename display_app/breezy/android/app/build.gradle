@@ -43,7 +43,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.jovial.breezy"
+        applicationId "com.jovial.breezy_display"
         minSdkVersion 16
         targetSdkVersion 28
         versionCode flutterVersionCode.toInteger()

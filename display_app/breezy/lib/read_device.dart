@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show AssetBundle;
 import 'package:pedantic/pedantic.dart' show unawaited;
+import 'package:usb_serial/usb_serial.dart';
 
-import 'main.dart' show Log;
+import 'main.dart' show Log, Settings;
 import 'rolling_deque.dart' show TimedData;
 import 'dart:typed_data';
 import 'dart:async' show Timer;
@@ -68,6 +69,9 @@ abstract class DeviceDataSource {
   static DeviceDataSource fromAssetFile(AssetBundle b, String name) =>
       _AssetFileDataSource(b, name);
 
+  static DeviceDataSource fromSerial(Settings settings) =>
+      _SerialDataSource(settings);
+
   @mustCallSuper
   void start(DeviceDataListener listener) {
     assert(listener != null);
@@ -88,8 +92,24 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
   final _lineBuffer = StringBuffer();
   int _lastTime; // Starts out null
   int _currTime = 0; // 64 bits
+  bool _stopped = false;
 
   _ByteStreamDataSource(this._meterReading);
+
+  @override
+  start(DeviceDataListener listener) {
+    super.start(listener);
+    _stopped = false;
+    unawaited(readUntilStopped());
+  }
+
+  Future<void> readUntilStopped();
+
+  @override
+  void stop() {
+    super.stop();
+    _stopped = true;
+  }
 
   Future<void> receive(Uint8List data) async {
     for (int ch in data) {
@@ -170,18 +190,77 @@ class _AssetFileDataSource extends _ByteStreamDataSource {
   _AssetFileDataSource(this._bundle, this._name) : super(true);
 
   @override
-  start(DeviceDataListener listener) {
-    super.start(listener);
-    _stopped = false;
-    unawaited(readUntilStopped());
-  }
-
   Future<void> readUntilStopped() async {
     while (!_stopped) {
       ByteData d = await _bundle.load(_name);
       await receive(d.buffer.asUint8List(d.offsetInBytes, d.lengthInBytes));
       // Just keep time marching forward, while looping through the data.
       _lastTime = null;
+    }
+  }
+}
+
+class _SerialDataSource extends _ByteStreamDataSource {
+  final int baudRate;
+  final int portNumber;
+  UsbPort _port;
+
+  _SerialDataSource(Settings settings)
+      : this.baudRate = settings.baudRate,
+        this.portNumber = settings.serialPortNumber,
+        super(settings.meterData);
+
+  @override
+  void stop() {
+    super.stop();
+    if (_port != null) {
+      try {
+        _port.close();
+        _port = null;
+      } catch (ex) {
+        Log.writeln("Error closing serial port:  $ex");
+      }
+    }
+  }
+
+  @override
+  Future<void> readUntilStopped() async {
+    List<UsbDevice> devices = await UsbSerial.listDevices();
+    try {
+      if (_stopped) {
+        return;
+      }
+      _port = await devices[portNumber - 1].create();
+      if (_stopped) {
+        return;
+      }
+      if (!(await _port.open())) {
+        throw Exception("Failed to open device.");
+      }
+      if (_stopped) {
+        return;
+      }
+      await _port.setDTR(true);
+      if (_stopped) {
+        return;
+      }
+      await _port.setRTS(true);
+      if (_stopped) {
+        return;
+      }
+      await _port.setPortParameters(baudRate, UsbPort.DATABITS_8,
+          UsbPort.STOPBITS_1, UsbPort.PARITY_NONE);
+      if (_stopped) {
+        return;
+      }
+      _port.inputStream.listen((Uint8List event) async {
+        if (_stopped) {
+          return;
+        }
+        await receive(event);
+      });
+    } catch (ex) {
+      Log.writeln('Serial error: $ex');
     }
   }
 }
@@ -212,7 +291,7 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
     final frobbed = _currTime.remainder(3.7);
     charted[0] = _random.nextDouble() * 5 + (frobbed < 1.5 ? -80 : 90);
     charted[1] = (frobbed < 1.5 ? frobbed * 50 : -99);
-    charted[2] = 500.0 + 550 * sin(_currTime); // Some out of range
+    charted[2] = 550 * sin(_currTime); // Some out of range
     final displayed = List<String>(11);
     displayed[0] = "MM.M"; // 'M' is usually the widest character
     displayed[1] = "MM.M";
