@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 
 /*
@@ -31,7 +30,7 @@ SOFTWARE.
 class ValueBox extends StatelessWidget {
   static final _borderColor = Colors.grey[700];
 
-  final double value;
+  final String value;
   final String label;
   final String units;
 
@@ -45,14 +44,10 @@ class ValueBox extends StatelessWidget {
             border: Border(
                 top: BorderSide(width: 1, color: _borderColor),
                 left: BorderSide(width: 1, color: _borderColor))),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            SizedBox(height: 10),
-            Container(
-              margin: EdgeInsets.only(left: 5),
-              child: Text(label)),
-          ],
+        child: ClipRect(
+          child: CustomPaint(
+            child: Text(label)
+          )
         ));
   }
 }

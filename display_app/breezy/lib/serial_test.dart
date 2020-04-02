@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:usb_serial/usb_serial.dart';
 import 'dart:typed_data';
+
+import 'main.dart' show Settings;
 /*
 MIT License
 
@@ -27,7 +29,9 @@ SOFTWARE.
  */
 
 class SerialTestPage extends StatefulWidget {
-  SerialTestPage({Key key}) : super(key: key);
+  SerialTestPage(this.settings, {Key key}) : super(key: key);
+
+  final Settings settings;
 
   @override
   _SerialTestPageState createState() => _SerialTestPageState();
@@ -59,21 +63,37 @@ class _SerialTestPageState extends State<SerialTestPage> {
     if (devices.isEmpty) {
       return;
     }
-    _println("Listening to ${devices[0]}...");
-    final UsbPort port = await devices[0].create();
+    int deviceNum = widget.settings.serialPortNumber;
+    _println("Device $deviceNum was chosen in settings.");
+    if (deviceNum == null) {
+      return;
+    }
+    deviceNum--;
+    if (deviceNum < 0 || deviceNum >= devices.length) {
+      return;
+    }
+    _println("Listening to ${devices[deviceNum]}...");
+    final UsbPort port = await devices[deviceNum].create();
     if (!(await port.open())) {
       _println("Failed to open device.");
     }
     await port.setDTR(true);
     await port.setRTS(true);
-    await port.setPortParameters(9600, UsbPort.DATABITS_8, UsbPort.STOPBITS_1,
+    _println("Setting to baud ${widget.settings.baudRate}, 8 databits, 1 stop bit, no parity");
+    await port.setPortParameters(widget.settings.baudRate, UsbPort.DATABITS_8, UsbPort.STOPBITS_1,
       UsbPort.PARITY_NONE);
-    port.inputStream.listen((Uint8List event) {
+    port.inputStream.listen((Uint8List event) async {
       final b = StringBuffer();
       for (final ch in event) {
         b.writeCharCode(ch);
       }
       _print(b.toString());
+      // If the serial input is coming faster than the Android hardware can
+      // handle, the following line should let the display task in often
+      // enough to see some screen updates.  In production, data should never
+      // come continuously and at full speed, because there's only one value
+      // every 20ms.
+      await Future.delayed(Duration(milliseconds: 1), () => null);
     });
   }
 
@@ -84,7 +104,7 @@ class _SerialTestPageState extends State<SerialTestPage> {
             title: Text('Breezy: Test Serial'),
             actions: <Widget>[
               IconButton(
-                  icon: Icon(Icons.delete),
+                  icon: const Icon(Icons.delete),
                   tooltip: 'Clear Text',
                   onPressed: () => setState(() => _text = StringBuffer()))
             ]),

@@ -25,7 +25,8 @@ apply plugin: 'com.android.application'
 apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
 def keystoreProperties = new Properties()
-def keystorePropertiesFile = rootProject.file('key.properties')
+def keystorePropertiesFile = file(java.nio.file.Paths.get(System.getProperty('user.home')).resolve('github/.key_properties'))
+
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
@@ -42,7 +43,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.jovial.breezy"
+        applicationId "com.jovial.breezy_display"
         minSdkVersion 16
         targetSdkVersion 28
         versionCode flutterVersionCode.toInteger()

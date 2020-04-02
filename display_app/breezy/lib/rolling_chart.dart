@@ -30,28 +30,22 @@ SOFTWARE.
 /// A rolling chart.  The X axis is time, from 0 to windowSize.  Numbers
 /// aren't given, and there's a 1/2 second black "gap" marking the current
 /// time.
-class RollingChart<D extends RollingDequeData> extends StatelessWidget {
-  final double maxValue;
-  final double minValue;
+class RollingChart<D extends TimedData> extends StatelessWidget {
   final double windowSize;
   final List<D> _data;
-  final double Function(D) _dataSelector;
+  final RollingChartSelector _selector;
   final charts.Color graphColor;
   final charts.Color graphOutOfRangeColor;
-  final String label;
 
   /// [data] must be sorted by time.remainder(window size).
   RollingChart(
-      {@required this.maxValue,
-      this.minValue = 0,
-      @required this.windowSize,
+      {@required this.windowSize,
       @required List<D> data,
-      @required double Function(D) dataSelector,
+      @required RollingChartSelector selector,
       charts.Color graphColor,
-      charts.Color graphOutOfRangeColor,
-      this.label = ''})
+      charts.Color graphOutOfRangeColor})
       : this._data = data,
-        this._dataSelector = dataSelector,
+        this._selector = selector,
         this.graphColor = (graphColor == null) ? defaultGraphColor : graphColor,
         this.graphOutOfRangeColor = (graphOutOfRangeColor == null)
             ? charts.MaterialPalette.red.shadeDefault
@@ -80,30 +74,31 @@ class RollingChart<D extends RollingDequeData> extends StatelessWidget {
           children: <Widget>[
             Row(children: [
               SizedBox.fromSize(size: Size(30, 1)),
-              Text(label, style: TextStyle(color: Colors.grey[400])),
+              Text(_selector.label, style: TextStyle(color: Colors.grey[400])),
             ]),
             charts.LineChart(<charts.Series<D, double>>[
               charts.Series<D, double>(
                   id: 'data',
                   colorFn: (d, __) {
-                    final v = _dataSelector(d);
+                    final v = _selector.getValue(d);
                     if (v == null) {
                       return graphColor; // doesn't matter
-                    } else if (v < minValue || v > maxValue) {
+                    } else if (v < _selector.minValue ||
+                        v > _selector.maxValue) {
                       return graphOutOfRangeColor;
                     } else {
                       return graphColor;
                     }
                   },
-                  domainFn: (d, _) => d.time.remainder(windowSize),
+                  domainFn: (d, _) => d.timeMS.remainder(windowSize),
                   measureFn: (d, _) {
-                    final v = _dataSelector(d);
+                    final v = _selector.getValue(d);
                     if (v == null) {
                       return null;
-                    } else if (v < minValue) {
-                      return minValue;
-                    } else if (v > maxValue) {
-                      return maxValue;
+                    } else if (v < _selector.minValue) {
+                      return _selector.minValue;
+                    } else if (v > _selector.maxValue) {
+                      return _selector.maxValue;
                     } else {
                       return v;
                     }
@@ -111,7 +106,8 @@ class RollingChart<D extends RollingDequeData> extends StatelessWidget {
                   data: _data)
             ],
                 primaryMeasureAxis: charts.NumericAxisSpec(
-                  viewport: charts.NumericExtents(minValue, maxValue),
+                  viewport: charts.NumericExtents(
+                      _selector.minValue, _selector.maxValue),
                   renderSpec: charts.GridlineRendererSpec<num>(
                       labelStyle: charts.TextStyleSpec(
                         color: charts.MaterialPalette.gray.shade200,
@@ -134,4 +130,11 @@ class RollingChart<D extends RollingDequeData> extends StatelessWidget {
           ],
         ));
   }
+}
+
+abstract class RollingChartSelector<D extends TimedData> {
+  String get label;
+  double get minValue;
+  double get maxValue;
+  double getValue(D data);
 }

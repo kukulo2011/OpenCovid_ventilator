@@ -31,17 +31,17 @@ The fields are as follows:
 | `cmH2O` | float |  -99 to 99  |  Actual pressure (to be plotted)  |
 | `l/min` | float |  -999 to 999  |  Actual flow (to be plotted) |
 | `ml` | float |  0 to 9999  |  Actual volume (to be plotted) |
-| `Ppeak (cmH2O)` | float | 0 to 99 |  Peak pressure  |
-| `Pmean (cmH2O)` | float | 0 to 99 |  Mean pressure  |
-| `PEEP (cmH2O)` | float | 0 to 99 |  Positive end-expiratory pressure  |
-| `RR` | float | 0 to 99 |  Respiratory rate (b/min)  |
-| `O2 (%)` | float |  0-100 |  Oxygen concentration  |
-| `Ti (s)` | float |  0 to 99 |  Inspiration time  |
-| `I:E` | float | 0 to 99 |  Inspiration : Expiration ratio, print as 1:???  |
-| `MVi (l/min)` | float | 0 to 99 |  Mean volume inspiration  |
-| `MVe (l/min)` | float | 0 to 99 |  Mean volume expiration  |
-| `VTi (ml)` | float | 0 to 9999 |  Volume tidal inspiration  |
-| `VTe (ml)` | float | 0 to 9999 |  Volume tidal expiration  |
+| `Ppeak (cmH2O)` | formatted float | ##.# |  Peak pressure  |
+| `Pmean (cmH2O)` | formatted float | ##.# |  Mean pressure  |
+| `PEEP (cmH2O)` | formatted float | ##.# |  Positive end-expiratory pressure  |
+| `RR` | formatted float | ##.# |  Respiratory rate (b/min)  |
+| `O2 (%)` | formatted float |  ### (0-100) |  Oxygen concentration  |
+| `Ti (s)` | formatted float |  ##.# |  Inspiration time  |
+| `I:E` | formatted float | ##.# |  Inspiration : Expiration ratio, print as 1:???  |
+| `MVi (l/min)` | formatted float | ##.# |  Mean volume inspiration  |
+| `MVe (l/min)` | formatted float | ##.# |  Mean volume expiration  |
+| `VTi (ml)` | formatted float | #### |  Volume tidal inspiration  |
+| `VTe (ml)` | formatted float | #### |  Volume tidal expiration  |
 | `checksum` | int |  0-65535 or -1 | A value of -1 means "no checksum" |
 | `line end` | String | "\r\n" | End of message |
 
@@ -50,12 +50,12 @@ the sample at time 65532 would be followed by a sample at time 16.  Note
 that if a few samples are missed, the time will remain synchronized.  This
 would not be true if only time deltas were sent.
 
-The expected range is the set of expected values.  For the measured
-quantities, actual values can go outside of this range, but if
-they do, the line graph might clamp the value and color it
-red.  For values displayed as numbers, values outside of the
-expected range might have formatting issues if more digits are
-required.
+The expected range is the set of expected values.  For the line graph, 
+actual values can go outside of this range, but if
+they do, the line graph will clamp the value and color it
+red.  For formatted float values, whitespace will be displayed.
+Values longer than the given format string might have formatting
+issues.
 
 The checksum is calculated over the ASCII character values starting
 at the first character of `protocol_name` and ending with the comma
@@ -66,3 +66,5 @@ The CRC algorithm is CRC-16-CCITT, as specified
 by [The CRC Wikipedia Page](https://en.wikipedia.org/wiki/Cyclic_redundancy_check).  Sample C code to calculate this can be found at
 http://srecord.sourceforge.net/crc16-ccitt.html.
 
+Lines beginning with "#" will be treated as comments:  They will
+be discarded without logging a parse error.
