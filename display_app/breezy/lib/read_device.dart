@@ -5,6 +5,7 @@ import 'package:usb_serial/usb_serial.dart';
 
 import 'main.dart' show Log, Settings;
 import 'rolling_deque.dart' show TimedData;
+import 'spec.dart' as spec show DataFeed;
 import 'dart:typed_data';
 import 'dart:async' show Timer;
 import 'dart:math';
@@ -53,17 +54,25 @@ class DeviceData extends TimedData {
         displayedValues = null;
 }
 
+class DataFeed {
+  final int numberOfParts = 18;
+}
+
 abstract class DeviceDataListener {
   void processDeviceData(DeviceData d);
 }
 
 abstract class DeviceDataSource {
+  final spec.DataFeed feedSpec;
   DeviceDataListener _listener;
+
+  DeviceDataSource(this.feedSpec);
 
   /// A device data source for debugging the screen.  It produces data values
   /// expected to take the maximum screen width, logging values that go
   /// out of range, and stuff like that.
-  static DeviceDataSource screenDebug() => _ScreenDebugDeviceDataSource();
+  static DeviceDataSource screenDebug(Settings settings) =>
+      _ScreenDebugDeviceDataSource(settings);
 
   /// A source that reads from a file that's baked into the asset bundle
   static DeviceDataSource fromAssetFile(AssetBundle b, String name) =>
@@ -95,7 +104,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
   bool _stopped = false;
   DateTime _startTime;
 
-  _ByteStreamDataSource(this._meterData);
+  _ByteStreamDataSource(spec.DataFeed feed, this._meterData) : super(feed);
 
   @override
   start(DeviceDataListener listener) {
@@ -156,7 +165,17 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
           displayed[i] = parts[pos++];
         }
         int checksum = int.parse(parts[pos++]);
-        // TODO:  Check checksum
+        if (checksum != -1) {
+          final crc = Crc16();
+          final lastComma = line.lastIndexOf(",");
+          for (int i = 0; i <= lastComma; i++) {
+            crc.addByte(line.codeUnitAt(i));
+          }
+          if (checksum != crc.result) {
+            Log.writeln(
+                'crc16 calculated:  ${crc.result} received:  $checksum');
+          }
+        }
         assert(pos == parts.length);
         if (_lastTime != null) {
           int deltaT = (time - _lastTime) & 0xffff;
@@ -165,9 +184,8 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
           }
           _currTime += deltaT;
           if (_meterData) {
-            int now =
-                DateTime.now().difference(_startTime).inMilliseconds;
-            int dNow= _currTime - now;
+            int now = DateTime.now().difference(_startTime).inMilliseconds;
+            int dNow = _currTime - now;
             if (dNow > 0) {
               waited = true;
               await Future.delayed(Duration(milliseconds: dNow), () => null);
@@ -197,7 +215,8 @@ class _AssetFileDataSource extends _ByteStreamDataSource {
   final String _name;
   bool _stopped = false;
 
-  _AssetFileDataSource(this._bundle, this._name) : super(true);
+  _AssetFileDataSource(this._bundle, this._name)
+      : super(spec.DataFeed.defaultFeed, true);
 
   @override
   Future<void> readUntilStopped() async {
@@ -218,7 +237,7 @@ class _SerialDataSource extends _ByteStreamDataSource {
   _SerialDataSource(Settings settings)
       : this.baudRate = settings.baudRate,
         this.portNumber = settings.serialPortNumber,
-        super(settings.meterData);
+        super(settings.dataFeedSpec, settings.meterData);
 
   @override
   void stop() {
@@ -280,7 +299,8 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
   static final _random = Random();
   double _currTime = 0;
 
-  _ScreenDebugDeviceDataSource();
+  _ScreenDebugDeviceDataSource(Settings settings)
+      : super(settings.dataFeedSpec);
 
   @override
   void start(DeviceDataListener listener) {
@@ -316,5 +336,67 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
     displayed[10] = "MMMM";
     _listener?.processDeviceData(DeviceData(_currTime, charted, displayed));
     _currTime += 0.020;
+  }
+}
+
+/// Calculate a CRC-16 checksum according to CRC-16-CCITT
+/// cf. https://en.wikipedia.org/wiki/Cyclic_redundancy_check
+/// Translated from the C code at http://srecord.sourceforge.net/crc16-ccitt.html#source
+///
+/// Usage:  ```
+///     int expected = ...;
+///     var checksum = Crc16();
+///     checksum.addByte(...)
+///     checksum.addByte(...)
+///     checksum.addByte(...)
+///        ...
+///     if (checksum.result != expected) {
+///         ...
+///     }
+///  ```
+class Crc16 {
+  static const int _poly = 0x1021; // crc-ccitt mask
+  int _crc = 0xffff;
+
+  void reset() {
+    _crc = 0xffff;
+  }
+
+  void addByte(int ch) {
+    int v = 0x80;
+    for (int i = 0; i < 8; i++) {
+      final bool xor = _crc & 0x8000 != 0;
+      _crc <<= 1;
+      _crc &= 0xffff;
+      if (ch & v != 0) {
+        // Append next bit of message to end of CRC if it is not zero.
+        // The zero bit placed there by the shift above need not be
+        // changed if the next bit of the message is zero.
+        _crc++;
+        _crc &= 0xffff;
+      }
+      if (xor) {
+        _crc = _crc ^ _poly;
+      }
+      // Align test bit with next bit of message byte
+      v >>= 1;
+    }
+  }
+
+  // Called augument_message_for_good_crc() in
+  // http://srecord.sourceforge.net/crc16-ccitt.html#source
+  /// Get the result.  It's OK to call this multiple times, even if
+  /// data is added in between.
+  int get result {
+    int result = _crc;
+    for (int i = 0; i < 16; i++) {
+      bool xor = result & 0x8000 != 0;
+      result <<= 1;
+      result &= 0xffff;
+      if (xor) {
+        result = result ^ _poly;
+      }
+    }
+    return result;
   }
 }

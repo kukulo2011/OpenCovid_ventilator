@@ -5,6 +5,7 @@ import 'serial_test.dart';
 import 'graphs_screen.dart';
 import 'read_device.dart';
 import 'settings_screen.dart';
+import 'spec.dart' as spec show DataFeed;
 
 /*
 MIT License
@@ -168,7 +169,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
         return DeviceDataSource.fromAssetFile(
             DefaultAssetBundle.of(context), "assets/demo.log");
       case InputSource.screenDebug:
-        return DeviceDataSource.screenDebug();
+        return DeviceDataSource.screenDebug(settings);
     }
     return null;
   }
@@ -229,4 +230,7 @@ class Settings {
     _meterData = v;
     _notify();
   }
+
+  // TODO:  Get from current appilcation spec
+  final spec.DataFeed dataFeedSpec = spec.DataFeed.defaultFeed;
 }
