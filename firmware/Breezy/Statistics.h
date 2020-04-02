@@ -34,7 +34,10 @@ class Statistics{
   float vte_int; // mvi integrator
   uint32_t last_insp_started_ms;
   uint32_t last_exp_started_ms;
-  
+  float p_peak_detect;
+  float p_mean_detect;
+  uint16_t p_mean_count;
+  float peep_detect;
 };
 
 extern Statistics statistics;

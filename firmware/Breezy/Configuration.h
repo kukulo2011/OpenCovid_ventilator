@@ -8,7 +8,11 @@
 // Flow higher than this will switch to the inspiration state
 // lower than negative will swith to the expiration state
 // unit: lpm
-#define INSPIRATION_FLOW_DETECT_TRIGGER (1.1)
+#define INSPIRATION_FLOW_DETECT_TRIGGER (4.5)
+
+// Minimum times - helps to debounce inspiration / expiration detection
+#define MIN_INSPIRATION_TIME_MS 400
+#define MIN_EXPIRATION_TIME_MS 600
 
 // maximum value ADC on used MCU
 #define ADC_MAXVAL (1023)
