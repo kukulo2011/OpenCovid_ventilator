@@ -1,10 +1,9 @@
 #include <Arduino.h>
 #include "SFM3300.h"
 #include "I2C.h"
-#include "Sensors.h"
-#include "crc16.h" 
+#include "Statistics.h"
+#include "Messaging.h" 
 
-Sensors sensors;
 
 void setup() {
   
@@ -12,14 +11,17 @@ void setup() {
 
   Serial.println("MCU_RESET");
 
-  sensors.init();
+  statistics.init();
 }
 
 void loop() {
 
-  sensors.measure();
-  sensors.print_msg();
-  sensors.print_service_msg();
+  statistics.poll();
+  messaging.poll();
+  
+  
+  messaging.print_msg();
+  messaging.print_service_msg();
   
   delay(50);
 }
