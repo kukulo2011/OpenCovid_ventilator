@@ -298,9 +298,13 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
   Timer _timer;
   static final _random = Random();
   double _currTime = 0;
+  final List<double> lastValue;
+  final List<double> nextChange;
 
   _ScreenDebugDeviceDataSource(Settings settings)
-      : super(settings.dataFeedSpec);
+      : lastValue = Float64List(settings.dataFeedSpec.displayedValues.length),
+        nextChange = Float64List(settings.dataFeedSpec.displayedValues.length),
+        super(settings.dataFeedSpec);
 
   @override
   void start(DeviceDataListener listener) {
@@ -319,21 +323,29 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
   void _tick() {
     final charted = Float64List(3);
     final frobbed = _currTime.remainder(3.7);
+    // TODO:  Use the spec for charted values
     charted[0] = _random.nextDouble() * 5 + (frobbed < 1.5 ? -80 : 90);
     charted[1] = (frobbed < 1.5 ? frobbed * 50 : -99);
     charted[2] = 550 * sin(_currTime); // Some out of range
-    final displayed = List<String>(11);
-    displayed[0] = "MM.M"; // 'M' is usually the widest character
-    displayed[1] = "MM.M";
-    displayed[2] = "MM.M";
-    displayed[3] = "MM.M";
-    displayed[4] = "1MM";
-    displayed[5] = "MM.M";
-    displayed[6] = "MM.M";
-    displayed[7] = "MM.M";
-    displayed[8] = "MM.M";
-    displayed[9] = "MMMM";
-    displayed[10] = "MMMM";
+    final displayed = List<String>(feedSpec.displayedValues.length);
+    for (int i = 0; i < displayed.length; i++) {
+      final spec = feedSpec.displayedValues[i];
+      if (_currTime >= nextChange[i]) {
+        nextChange[i] = _currTime + _random.nextDouble() * 4;
+        if (_random.nextDouble() < 0.2) {
+          // Go to min or max value 20% of the time
+          if (_random.nextDouble() < 0.5) {
+            lastValue[i] = spec.minValue;
+          } else {
+            lastValue[i] = spec.maxValue;
+          }
+        } else {
+          lastValue[i] = spec.minValue +
+              (spec.maxValue - spec.minValue) * _random.nextDouble();
+        }
+      }
+      displayed[i] = spec.format.format(lastValue[i]);
+    }
     _listener?.processDeviceData(DeviceData(_currTime, charted, displayed));
     _currTime += 0.020;
   }

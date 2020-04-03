@@ -40,18 +40,18 @@ const _graphLabels = [
   //        near that.  And ten liters of air is a lot!
 ];
 
-const _displayedValues = [
-  _DisplayedValueSelector('Ppeak', 'mbar', 0),
-  _DisplayedValueSelector('Pmean', 'mbar', 1),
-  _DisplayedValueSelector('PEEP', 'mbar', 2),
-  _DisplayedValueSelector('RR', 'b/min', 3),
-  _DisplayedValueSelector('O2', '%', 4),
-  _DisplayedValueSelector('Ti', 's', 5),
-  _DisplayedValueSelector('I:E', '', 6),
-  _DisplayedValueSelector('MVi', 'l/min', 7),
-  _DisplayedValueSelector('MVe', 'l/min', 8),
-  _DisplayedValueSelector('VTi', '', 9),
-  _DisplayedValueSelector('VTe', 'ml', 10)
+final _displayedValues = [
+  DisplayedValueSelector('Ppeak', 'mbar', '##.#', Colors.orange.shade300, 0),
+  DisplayedValueSelector('Pmean', 'mbar', '##.#', Colors.orange.shade300, 1),
+  DisplayedValueSelector('PEEP', 'mbar', '##.#', Colors.orange.shade300, 2),
+  DisplayedValueSelector('RR', 'b/min', '##.#', Colors.lightGreen, 3),
+  DisplayedValueSelector('O2', '%', '1##', Colors.lightGreen, 4),
+  DisplayedValueSelector('Ti', 's', '##.#', Colors.lightGreen, 5),
+  DisplayedValueSelector('I:E', '', '##.#', Colors.lightGreen, 6),
+  DisplayedValueSelector('MVi', 'l/min', '##.#', Colors.lightBlue, 7),
+  DisplayedValueSelector('MVe', 'l/min', '##.#', Colors.lightBlue, 8),
+  DisplayedValueSelector('VTi', '', '####', Colors.lightBlue, 9),
+  DisplayedValueSelector('VTe', 'ml', '####', Colors.lightBlue, 10)
 ];
 
 class _GraphSelector implements RollingChartSelector<DeviceData> {
@@ -69,11 +69,14 @@ class _GraphSelector implements RollingChartSelector<DeviceData> {
   double getValue(DeviceData data) => data.chartedValues?.elementAt(_index);
 }
 
-class _DisplayedValueSelector {
+class DisplayedValueSelector {
   final String label;
   final String units;
+  final String format;
+  final Color color;
   final int index;
-  const _DisplayedValueSelector(this.label, this.units, this.index);
+  DisplayedValueSelector(
+      this.label, this.units, this.format, this.color, this.index);
 }
 
 ///
@@ -150,7 +153,9 @@ class _GraphsScreenState extends State<GraphsScreen>
                                 bottom:
                                     BorderSide(width: 1, color: _borderColor))),
                         child: buildMainContents())),
-                SizedBox(width: 20, height: 20,
+                SizedBox(
+                  width: 20,
+                  height: 20,
                   child: IconButton(
                       icon: Icon(Icons.arrow_back),
                       iconSize: 14,
@@ -168,7 +173,7 @@ class _GraphsScreenState extends State<GraphsScreen>
     return Row(
       children: [
         Expanded(
-          flex: 7,
+          flex: 8,
           child: Column(children: [
             Expanded(
                 child: RollingChart<DeviceData>(
@@ -192,12 +197,13 @@ class _GraphsScreenState extends State<GraphsScreen>
           ]),
         ),
         Expanded(
-          flex: 3,
+          flex: 4,
           child: Column(children: [
             Expanded(
                 child: Row(
               children: <Widget>[
                 Expanded(
+                  flex: 4,
                   child: Column(
                     children: <Widget>[
                       Expanded(
@@ -207,6 +213,7 @@ class _GraphsScreenState extends State<GraphsScreen>
                   ),
                 ),
                 Expanded(
+                  flex: 3,
                   child: Column(children: [
                     Expanded(
                         child: _DisplayedValueBox(
@@ -222,6 +229,7 @@ class _GraphsScreenState extends State<GraphsScreen>
                 child: Row(
               children: <Widget>[
                 Expanded(
+                  flex: 4,
                   child: Column(
                     children: <Widget>[
                       Expanded(
@@ -234,6 +242,7 @@ class _GraphsScreenState extends State<GraphsScreen>
                   ),
                 ),
                 Expanded(
+                  flex: 3,
                   child: Column(children: [
                     Expanded(
                         child: _DisplayedValueBox(
@@ -249,6 +258,7 @@ class _GraphsScreenState extends State<GraphsScreen>
                 child: Row(
               children: <Widget>[
                 Expanded(
+                  flex: 4,
                   child: Column(
                     children: <Widget>[
                       Expanded(
@@ -261,6 +271,7 @@ class _GraphsScreenState extends State<GraphsScreen>
                   ),
                 ),
                 Expanded(
+                  flex: 3,
                   child: Column(children: [
                     Expanded(
                         child: _DisplayedValueBox(
@@ -280,9 +291,11 @@ class _GraphsScreenState extends State<GraphsScreen>
 }
 
 class _DisplayedValueBox extends ValueBox {
-  _DisplayedValueBox({_DisplayedValueSelector selector, DeviceData data})
+  _DisplayedValueBox({DisplayedValueSelector selector, DeviceData data})
       : super(
             value: data?.displayedValues?.elementAt(selector.index),
             label: selector.label,
+            format: selector.format,
+            color: selector.color,
             units: selector.units);
 }
