@@ -32,18 +32,18 @@ SOFTWARE.
  */
 
 const _graphLabels = [
-  _GraphSelector('PRESSURE mbar', -100.0, 100.0, 0),
+  _GraphSelector('PRESSURE cmH2O', -10.0, 50.0, 0),
   _GraphSelector('FLOW l/min', -100.0, 100.0, 1),
   // TODO:  Spec says -999 to 999, but the sample data is different.
-  _GraphSelector('VOLUME ml', -500.0, 500.0, 2),
+  _GraphSelector('VOLUME ml', 0.0, 800.0, 2),
   // TODO:  Spec claims volum is 0..9999, but the sample data is nowhere
   //        near that.  And ten liters of air is a lot!
 ];
 
 final _displayedValues = [
-  DisplayedValueSelector('Ppeak', 'mbar', '##.#', Colors.orange.shade300, 0),
-  DisplayedValueSelector('Pmean', 'mbar', '##.#', Colors.orange.shade300, 1),
-  DisplayedValueSelector('PEEP', 'mbar', '##.#', Colors.orange.shade300, 2),
+  DisplayedValueSelector('Ppeak', 'cmH2O', '##.#', Colors.orange.shade300, 0),
+  DisplayedValueSelector('Pmean', 'cmH2O', '##.#', Colors.orange.shade300, 1),
+  DisplayedValueSelector('PEEP', 'cmH2O', '##.#', Colors.orange.shade300, 2),
   DisplayedValueSelector('RR', 'b/min', '##.#', Colors.lightGreen, 3),
   DisplayedValueSelector('O2', '     %', '1##', Colors.lightGreen, 4),
   DisplayedValueSelector('Ti', 's', '##.#', Colors.lightGreen, 5),

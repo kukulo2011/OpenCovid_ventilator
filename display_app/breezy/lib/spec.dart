@@ -11,9 +11,9 @@ class DataFeed {
   const DataFeed(this.chartedValues, this.displayedValues);
 
   static DataFeed defaultFeed = DataFeed([
+    ChartedValue(-10, 50),
     ChartedValue(-100, 100),
-    ChartedValue(-100, 100),
-    ChartedValue(-500, 500)
+    ChartedValue(0, 800)
   ], [
     FormattedValue('#0.0', 0, 99.9),
     FormattedValue('#0.0', 0, 99.9),
