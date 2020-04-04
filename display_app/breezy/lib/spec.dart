@@ -21,7 +21,7 @@ class DataFeed {
     FormattedValue('#0.0', 0, 99.9),
     FormattedValue('##0', 0, 100.0),
     FormattedValue('#0.0', 0, 99.9),
-    FormattedValue('#0.0', 0, 99.9),
+    FormattedValue('0.0', 0, 9.9),
     FormattedValue('#0.0', 0, 99.9),
     FormattedValue('#0.0', 0, 99.9),
     FormattedValue('###0', 0, 9999),

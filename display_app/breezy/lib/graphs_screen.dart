@@ -48,7 +48,7 @@ final _displayedValues = [
   DisplayedValueSelector(4, 'O2', null, '1##', Colors.lightGreen,
       postfix: '%'),
   DisplayedValueSelector(5, 'Ti', 's', '##.##', Colors.lightGreen),
-  DisplayedValueSelector(6, 'I:E', null, '##.#', Colors.lightGreen,
+  DisplayedValueSelector(6, 'I:E', null, '#.#', Colors.lightGreen,
       prefix: '1:'),
   DisplayedValueSelector(7, 'MVi', 'l/min', '##.#', Colors.lightBlue),
   DisplayedValueSelector(8, 'MVe', 'l/min', '##.#', Colors.lightBlue),

@@ -5,7 +5,7 @@ import 'package:usb_serial/usb_serial.dart';
 
 import 'main.dart' show Log, Settings;
 import 'rolling_deque.dart' show TimedData;
-import 'spec.dart' as spec show DataFeed;
+import 'spec.dart' as spec;
 import 'dart:typed_data';
 import 'dart:async' show Timer;
 import 'dart:math';
@@ -294,17 +294,52 @@ class _SerialDataSource extends _ByteStreamDataSource {
   }
 }
 
+typedef _ScreenDebugFunction = double Function(double time, spec.ChartedValue);
+
 class _ScreenDebugDeviceDataSource extends DeviceDataSource {
   Timer _timer;
   static final _random = Random();
   double _currTime = 0;
+  final chartFunctions = List<_ScreenDebugFunction>();
   final List<double> lastValue;
   final List<double> nextChange;
+
+  // A selection of pretty-looking functions.  They're in a list so we
+  // can randomly pick different ones each time we run.
+  static List<_ScreenDebugFunction> functions = [
+    (double time, spec.ChartedValue spec) {
+      final range = spec.maxValue - spec.minValue;
+      final frobbed = time.remainder(3.7);
+      return _random.nextDouble() * range / 50 +
+          (frobbed < 1.5
+              ? spec.minValue + range / 20
+              : spec.maxValue - range / 20);
+    },
+    (double time, spec.ChartedValue spec) {
+      final range = spec.maxValue - spec.minValue;
+      final frobbed = time.remainder(3.7);
+      return (frobbed < 1.5 ? range * frobbed / 1.5  : 0.0) + spec.minValue;
+    },
+    (double time, spec.ChartedValue spec) {
+      final range = spec.maxValue - spec.minValue;
+      return range * (0.5 + 0.55 * sin(time)) + spec.minValue; // Some out of range
+    },
+  ];
 
   _ScreenDebugDeviceDataSource(Settings settings)
       : lastValue = Float64List(settings.dataFeedSpec.displayedValues.length),
         nextChange = Float64List(settings.dataFeedSpec.displayedValues.length),
-        super(settings.dataFeedSpec);
+        super(settings.dataFeedSpec) {
+    final candidates = List<_ScreenDebugFunction>();
+    for (final spec.ChartedValue _ in feedSpec.chartedValues) {
+      if (candidates.isEmpty) {
+        candidates.addAll(functions);
+      }
+      final i = _random.nextInt(candidates.length);
+      chartFunctions.add(candidates[i]);
+      candidates.removeAt(i);
+    }
+  }
 
   @override
   void start(DeviceDataListener listener) {
@@ -321,12 +356,10 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
   }
 
   void _tick() {
-    final charted = Float64List(3);
-    final frobbed = _currTime.remainder(3.7);
-    // TODO:  Use the spec for charted values
-    charted[0] = _random.nextDouble() * 5 + (frobbed < 1.5 ? -80 : 90);
-    charted[1] = (frobbed < 1.5 ? frobbed * 50 : -99);
-    charted[2] = 550 * sin(_currTime); // Some out of range
+    final charted = Float64List(feedSpec.chartedValues.length);
+    for (int i = 0; i < charted.length; i++) {
+      charted[i] = chartFunctions[i](_currTime, feedSpec.chartedValues[i]);
+    }
     final displayed = List<String>(feedSpec.displayedValues.length);
     for (int i = 0; i < displayed.length; i++) {
       final spec = feedSpec.displayedValues[i];
