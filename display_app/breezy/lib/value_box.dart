@@ -36,13 +36,17 @@ class ValueBox extends StatelessWidget {
   final String format;
   final Color color;
   final String units;
+  final String prefix; // String before the value; may be null
+  final String postfix; // String after the value; may be null
 
   ValueBox(
       {@required this.value,
       @required this.label,
       @required this.format,
       @required this.color,
-      this.units}) {
+      this.units,
+      this.prefix,
+      this.postfix}) {
     assert(label != null);
     assert(format != null);
     assert(color != null);
@@ -57,7 +61,7 @@ class ValueBox extends StatelessWidget {
             border: Border(
                 top: BorderSide(width: 1, color: _borderColor),
                 left: BorderSide(width: 1, color: _borderColor))),
-        child: Stack (
+        child: Stack(
           children: <Widget>[
             Text(label, style: TextStyle(fontSize: 10)),
             Column(
@@ -67,6 +71,8 @@ class ValueBox extends StatelessWidget {
                 Expanded(
                   child: DecimalAlignedText(
                       value: value,
+                      prefix: prefix,
+                      postfix: postfix,
                       units: units,
                       unitsFontSize: 10,
                       format: format,
@@ -84,6 +90,11 @@ class ValueBox extends StatelessWidget {
 class DecimalAlignedText extends StatefulWidget {
   final String value; // may be null
   final String format;
+
+  /// Shown before the value
+  final String prefix; // may be null
+  /// Shown after the value
+  final String postfix; // may be null
   final String units;
   final double unitsFontSize;
 
@@ -105,6 +116,8 @@ class DecimalAlignedText extends StatefulWidget {
       {@required this.value,
       @required this.format,
       @required this.color,
+      this.prefix,
+      this.postfix,
       this.units,
       this.unitsFontSize,
       this.unitsFontSizeFraction = 0.5,
@@ -121,8 +134,11 @@ class DecimalAlignedText extends StatefulWidget {
 class _DecimalAlignedTextState extends State<DecimalAlignedText> {
   NumberFormat numberFormat;
   int decimalIndex; // If no decimal, length of format string
-  double valueBeforeWidth;
+  double valueBeforeWidth; // Width of the part of the value before '.'
   double valueAfterWidth; // Including decimal point
+  double prefixWidth;
+  double postfixWidth;
+  double valueTotalWidth;
   double valueHeight;
   double unitsHeight;
   double unitsWidth;
@@ -157,6 +173,20 @@ class _DecimalAlignedTextState extends State<DecimalAlignedText> {
       }
       valueBeforeWidth = p.getMaxIntrinsicWidth(double.infinity);
     }
+    if (widget.prefix == null) {
+      prefixWidth = 0;
+    } else {
+      p = getParagraph(100, widget.prefix);
+      prefixWidth = p.getMaxIntrinsicWidth(double.infinity);
+    }
+    if (widget.postfix == null) {
+      postfixWidth = 0;
+    } else {
+      p = getParagraph(100, widget.postfix);
+      postfixWidth = p.getMaxIntrinsicWidth(double.infinity);
+    }
+    valueTotalWidth =
+        valueBeforeWidth + valueAfterWidth + prefixWidth + postfixWidth;
     if (widget.units == null) {
       unitsHeight = 0;
       unitsWidth = 0;
@@ -202,10 +232,7 @@ class _ValueBoxPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    double fontSize = 100.0 *
-        widget.scale *
-        size.width /
-        (state.valueBeforeWidth + state.valueAfterWidth);
+    double fontSize = 100.0 * widget.scale * size.width / state.valueTotalWidth;
     // Font size based on width.  If height is constrained, this can go down.
     double unitsHeight = 0.0;
     double unitsWidth = 0.0;
@@ -226,7 +253,7 @@ class _ValueBoxPainter extends CustomPainter {
           fontSize = 100.0 *
               widget.scale *
               min(
-                  size.width / (state.valueBeforeWidth + state.valueAfterWidth),
+                  size.width / state.valueTotalWidth,
                   size.height /
                       (state.valueHeight * (1 + widget.unitsFontSizeFraction)));
           unitsFontSize = fontSize *
@@ -280,62 +307,65 @@ class _ValueBoxPainter extends CustomPainter {
       // For the whitespace below the value, take no more than the height
       // of units.  If constrained, split evenly between the margins
       // and the gap.
-      final offset = Offset(x, y);
-      final span = TextSpan(
-          text: widget.units,
-          style: TextStyle(color: widget.color, fontSize: unitsFontSize));
-      final painter = TextPainter(
-          text: span,
-          textAlign: TextAlign.left,
-          textDirection: TextDirection.ltr,
-          maxLines: 1);
-      painter.layout();
-      painter.paint(canvas, offset);
+      final style = TextStyle(color: widget.color, fontSize: unitsFontSize);
+      final span = TextSpan(text: widget.units, style: style);
+      _paintText(x, y, span, canvas);
+    }
+    final double prefixW = state.prefixWidth * fontSize / 100.0;
+    final double beforeW = state.valueBeforeWidth * fontSize / 100.0;
+    final double afterW = state.valueAfterWidth * fontSize / 100.0;
+    final double postfixW = state.postfixWidth * fontSize / 100.0;
+    final double totalW = prefixW + beforeW + afterW + postfixW;
+    final double y = vdy + (size.height - vh) / 2.0;
+    final style = TextStyle(color: widget.color, fontSize: fontSize);
+    double x = (size.width - totalW) / 2.0;
+    if (widget.prefix != null) {
+      final span = TextSpan(text: widget.prefix, style: style);
+      _paintText(x, y, span, canvas);
+      x += prefixW;
     }
     if (value == null) {
-      return;
-    }
-    int decimalIndex = value.indexOf('.');
-    final double uw = state.valueBeforeWidth * fontSize / 100.0;
-    final double fw = state.valueAfterWidth * fontSize / 100.0;
-    final double y = vdy + (size.height - vh) / 2.0;
-    if (decimalIndex == -1) {
-      decimalIndex = value.length;
+      x += beforeW + afterW;
     } else {
-      final double x = (size.width - fw + uw) / 2;
-      final offset = Offset(x, y);
-      final span = TextSpan(
-          text: value.substring(decimalIndex),
-          style: TextStyle(color: widget.color, fontSize: fontSize));
-      final painter = TextPainter(
-          text: span,
-          textAlign: TextAlign.left,
-          textDirection: TextDirection.ltr,
-          maxLines: 1);
-      painter.layout();
-      painter.paint(canvas, offset);
-    }
-    {
-      final span = TextSpan(
-          text: value.substring(0, decimalIndex),
-          style: TextStyle(color: widget.color, fontSize: fontSize));
-      final p = RenderParagraph(span,
+      int decimalIndex = value.indexOf('.');
+      if (decimalIndex == -1) {
+        decimalIndex = value.length;
+      }
+      {  // units part:
+        final span =
+        TextSpan(text: value.substring(0, decimalIndex), style: style);
+        final p = RenderParagraph(span,
           maxLines: 1,
           textDirection: TextDirection.ltr,
           textAlign: TextAlign.left);
-      p.layout(BoxConstraints());
-      final double uwReal = p.getMaxIntrinsicWidth(double.infinity);
-      final double x = (uw - uwReal) + (size.width - fw - uw) / 2;
-      final offset = Offset(x, y);
-
-      final painter = TextPainter(
-          text: span,
-          textAlign: TextAlign.right,
-          textDirection: TextDirection.ltr,
-          maxLines: 1);
-      painter.layout();
-      painter.paint(canvas, offset);
+        p.layout(BoxConstraints());
+        final double beforeReal = p.getMaxIntrinsicWidth(double.infinity);
+        x += beforeW;
+        _paintText(x - beforeReal, y, span, canvas);
+      }
+      if (decimalIndex != value.length) {
+        final span = TextSpan(
+          text: value.substring(decimalIndex), style: style);
+        _paintText(x, y, span, canvas);
+      }
+      x += afterW;
     }
+    if (widget.postfix != null) {
+      final span = TextSpan(text: widget.postfix, style: style);
+      _paintText(x, y, span, canvas);
+    }
+  }
+
+  void _paintText(
+      double x, double y, TextSpan span, Canvas canvas) {
+    final offset = Offset(x, y);
+    final painter = TextPainter(
+        text: span,
+        textAlign: TextAlign.left,
+        textDirection: TextDirection.ltr,
+        maxLines: 1);
+    painter.layout();
+    painter.paint(canvas, offset);
   }
 
   @override

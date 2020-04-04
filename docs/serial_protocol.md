@@ -36,7 +36,7 @@ The fields are as follows:
 | `PEEP (cmH2O)` | formatted float | ##.# |  Positive end-expiratory pressure  |
 | `RR` | formatted float | ##.# |  Respiratory rate (b/min)  |
 | `O2 (%)` | formatted float |  ### (0-100) |  Oxygen concentration  |
-| `Ti (s)` | formatted float |  ##.# |  Inspiration time  |
+| `Ti (s)` | formatted float |  ##.## |  Inspiration time  |
 | `I:E` | formatted float | ##.# |  Inspiration : Expiration ratio, print as 1:???  |
 | `MVi (l/min)` | formatted float | ##.# |  Mean volume inspiration  |
 | `MVe (l/min)` | formatted float | ##.# |  Mean volume expiration  |

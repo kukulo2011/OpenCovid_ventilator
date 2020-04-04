@@ -32,51 +32,56 @@ SOFTWARE.
  */
 
 const _graphLabels = [
-  _GraphSelector('PRESSURE cmH2O', -10.0, 50.0, 0),
-  _GraphSelector('FLOW l/min', -100.0, 100.0, 1),
+  _GraphSelector(0, 'PRESSURE cmH2O', -10.0, 50.0),
+  _GraphSelector(1, 'FLOW l/min', -100.0, 100.0),
   // TODO:  Spec says -999 to 999, but the sample data is different.
-  _GraphSelector('VOLUME ml', 0.0, 800.0, 2),
+  _GraphSelector(2, 'VOLUME ml', 0.0, 800.0),
   // TODO:  Spec claims volum is 0..9999, but the sample data is nowhere
   //        near that.  And ten liters of air is a lot!
 ];
 
 final _displayedValues = [
-  DisplayedValueSelector('Ppeak', 'cmH2O', '##.#', Colors.orange.shade300, 0),
-  DisplayedValueSelector('Pmean', 'cmH2O', '##.#', Colors.orange.shade300, 1),
-  DisplayedValueSelector('PEEP', 'cmH2O', '##.#', Colors.orange.shade300, 2),
-  DisplayedValueSelector('RR', 'b/min', '##.#', Colors.lightGreen, 3),
-  DisplayedValueSelector('O2', '     %', '1##', Colors.lightGreen, 4),
-  DisplayedValueSelector('Ti', 's', '##.#', Colors.lightGreen, 5),
-  DisplayedValueSelector('I:E', null, '##.#', Colors.lightGreen, 6),
-  DisplayedValueSelector('MVi', 'l/min', '##.#', Colors.lightBlue, 7),
-  DisplayedValueSelector('MVe', 'l/min', '##.#', Colors.lightBlue, 8),
-  DisplayedValueSelector('VTi', null, '####', Colors.lightBlue, 9),
-  DisplayedValueSelector('VTe', 'ml', '####', Colors.lightBlue, 10)
+  DisplayedValueSelector(0, 'Ppeak', 'cmH2O', '##.#', Colors.orange.shade300),
+  DisplayedValueSelector(1, 'Pmean', 'cmH2O', '##.#', Colors.orange.shade300),
+  DisplayedValueSelector(2, 'PEEP', 'cmH2O', '##.#', Colors.orange.shade300),
+  DisplayedValueSelector(3, 'RR', 'b/min', '##.#', Colors.lightGreen),
+  DisplayedValueSelector(4, 'O2', null, '1##', Colors.lightGreen,
+      postfix: '%'),
+  DisplayedValueSelector(5, 'Ti', 's', '##.##', Colors.lightGreen),
+  DisplayedValueSelector(6, 'I:E', null, '##.#', Colors.lightGreen,
+      prefix: '1:'),
+  DisplayedValueSelector(7, 'MVi', 'l/min', '##.#', Colors.lightBlue),
+  DisplayedValueSelector(8, 'MVe', 'l/min', '##.#', Colors.lightBlue),
+  DisplayedValueSelector(9, 'VTi', null, '####', Colors.lightBlue),
+  DisplayedValueSelector(10, 'VTe', 'ml', '####', Colors.lightBlue)
 ];
 
 class _GraphSelector implements RollingChartSelector<DeviceData> {
+  final int _index;
   @override
   final String label;
   @override
   final double minValue;
   @override
   final double maxValue;
-  final int _index;
 
-  const _GraphSelector(this.label, this.minValue, this.maxValue, this._index);
+  const _GraphSelector(this._index, this.label, this.minValue, this.maxValue);
 
   @override
   double getValue(DeviceData data) => data.chartedValues?.elementAt(_index);
 }
 
 class DisplayedValueSelector {
+  final int index;
   final String label;
   final String units;
   final String format;
   final Color color;
-  final int index;
+  final String prefix;
+  final String postfix;
   DisplayedValueSelector(
-      this.label, this.units, this.format, this.color, this.index);
+      this.index, this.label, this.units, this.format, this.color,
+      {this.prefix, this.postfix});
 }
 
 ///
@@ -297,5 +302,7 @@ class _DisplayedValueBox extends ValueBox {
             label: selector.label,
             format: selector.format,
             color: selector.color,
-            units: selector.units);
+            units: selector.units,
+            prefix: selector.prefix,
+            postfix: selector.postfix);
 }
