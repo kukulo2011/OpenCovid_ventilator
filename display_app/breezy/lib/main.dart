@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:pedantic/pedantic.dart';
-import 'dart:io' show exit, stdout;
+import 'package:path_provider/path_provider.dart';
+import 'dart:io' show exit, stdout, File, Directory;
+import 'dart:convert' as convert;
 import 'serial_test.dart';
 import 'graphs_screen.dart';
 import 'read_device.dart';
@@ -31,7 +33,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-void main() => runApp(MyApp());
+void main() async {
+  runApp(MyApp());
+}
 
 class Log {
   // TODO:  Send this to an internal buffer, so we can access it from a menu
@@ -75,6 +79,14 @@ class _BreezyHomePageState extends State<BreezyHomePage>
     settings.listeners.add(this);
   }
 
+  Future<void> readSettings() async {
+    if (Settings.settingsFile == null) {
+      Directory dir = await getApplicationSupportDirectory();
+      Settings.settingsFile = File("${dir.path}/settings.json");
+      await settings.read();
+    }
+  }
+
   @override
   void dispose() {
     super.dispose();
@@ -83,6 +95,14 @@ class _BreezyHomePageState extends State<BreezyHomePage>
 
   @override
   Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: readSettings(),
+      builder: (context, snapshot) {
+        return doBuild(context);
+      }
+    );
+  }
+  Widget doBuild(BuildContext context) {
     const bigTextStyle = TextStyle(fontSize: 20);
     return Scaffold(
         appBar: AppBar(
@@ -181,13 +201,57 @@ class _BreezyHomePageState extends State<BreezyHomePage>
 }
 
 enum InputSource { serial, screenDebug, assetFile }
+// NB:  Index is written in JSON format
 
 abstract class SettingsListener {
   void settingsChanged();
 }
 
 class Settings {
+  static File settingsFile;
   final listeners = List<SettingsListener>();
+  InputSource _inputSource = InputSource.assetFile;
+  int _serialPortNumber = 1;
+  int _baudRate = 115200;
+  bool _meterData = true;
+
+  Settings();
+
+  Future<void> read() async {
+    if (await settingsFile.exists()) {
+      final str = await settingsFile.readAsString();
+      final dynamic json = convert.json.decode(str);
+      dynamic v = json['inputSource'];
+      for (final e in InputSource.values) {
+        if (e.toString() == v) {
+          _inputSource = e;
+        }
+      }
+      v = json['serialPortNumber'];
+      if (v != null) {
+        _serialPortNumber = v as int;
+      }
+      v = json['baudRate'];
+      if (v != null) {
+        _baudRate = v as int;
+      }
+      v = json['meterData'];
+      if (v != null) {
+        _meterData = v as bool;
+      }
+    }
+  }
+
+  Future<void> write() async {
+    final json = {
+      'inputSource' : _inputSource.toString(),
+      'serialPortNumber' : _serialPortNumber,
+      'baudRate' : _baudRate,
+      'meterData' : _meterData
+    };
+    final str = convert.json.encode(json);
+    await settingsFile.writeAsString(str);
+  }
 
   void _notify() {
     for (var w in listeners) {
@@ -195,7 +259,6 @@ class Settings {
     }
   }
 
-  InputSource _inputSource = InputSource.assetFile;
   InputSource get inputSource => _inputSource;
   set inputSource(InputSource v) {
     _inputSource = v;
@@ -203,21 +266,18 @@ class Settings {
   }
 
   /// 1..n, or 0 if none selected
-  int _serialPortNumber = 1;
   int get serialPortNumber => _serialPortNumber;
   set serialPortNumber(int v) {
     _serialPortNumber = v;
     _notify();
   }
 
-  int _baudRate = 115200;
   int get baudRate => _baudRate;
   set baudRate(int v) {
     _baudRate = v;
     _notify();
   }
 
-  bool _meterData = true;
   bool get meterData {
     final v = _inputSource;
     if (v == InputSource.screenDebug || v == InputSource.assetFile) {
@@ -231,6 +291,6 @@ class Settings {
     _notify();
   }
 
-  // TODO:  Get from current appilcation spec
+  // TODO:  Get from current application spec, and remove from here.
   final spec.DataFeed dataFeedSpec = spec.DataFeed.defaultFeed;
 }

@@ -62,66 +62,82 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   Widget build(BuildContext context) {
     final isSerial = settings.inputSource == InputSource.serial;
-    return Scaffold(
-        appBar: AppBar(title: Text('Breezy Settings')),
-        body: SingleChildScrollView(
-            padding: EdgeInsets.all(5),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Input source:', style: Theme.of(context).textTheme.subhead),
-              RadioListTile<InputSource>(
-                  title: const Text('USB Serial Port'),
-                  value: InputSource.serial,
-                  groupValue: settings.inputSource,
-                  onChanged: (v) => settings.inputSource = v),
-              RadioListTile<InputSource>(
-                  title: const Text('Demo Log Data'),
-                  value: InputSource.assetFile,
-                  groupValue: settings.inputSource,
-                  onChanged: (v) => settings.inputSource = v),
-              RadioListTile<InputSource>(
-                  title: const Text('Screen Debug Functions'),
-                  value: InputSource.screenDebug,
-                  groupValue: settings.inputSource,
-                  onChanged: (v) => settings.inputSource = v),
-              PopupMenuButton<int>(
-                  child: ListTile(
-                    title: Text('Port number ${settings.serialPortNumber}',
-                        style: Theme.of(context).textTheme.title.merge(isSerial
-                            ? null
-                            : const TextStyle(color: Colors.grey))),
-                  ),
-                  onSelected: (v) => settings.serialPortNumber = v,
-                  itemBuilder: _buildSerialPortMenu),
-              PopupMenuButton<int>(
-                  child: ListTile(
-                    title: Text('Baud rate ${settings.baudRate}',
-                        style: Theme.of(context).textTheme.title.merge(isSerial
-                            ? null
-                            : const TextStyle(color: Colors.grey))),
-                  ),
-                  onSelected: (v) => settings.baudRate = v,
-                  itemBuilder: (context) => const [
-                        PopupMenuItem(value: 2400, child: Text('2400')),
-                        PopupMenuItem(value: 9600, child: Text('9600')),
-                        PopupMenuItem(value: 19200, child: Text('19200')),
-                        PopupMenuItem(value: 38400, child: Text('38400')),
-                        PopupMenuItem(value: 115200, child: Text('115200')),
-                      ]),
-              PopupMenuButton<bool>(
-                  child: ListTile(
-                    title: Text(
-                        'Meter incoming data by timestamp: ${settings.meterData}',
-                        style: Theme.of(context).textTheme.title.merge(isSerial
-                            ? null
-                            : const TextStyle(color: Colors.grey))),
-                  ),
-                  onSelected: (v) => settings.meterData = v,
-                  itemBuilder: (context) => const [
-                        PopupMenuItem(value: true, child: Text('true')),
-                        PopupMenuItem(value: false, child: Text('false'))
-                      ]),
-            ])));
+    return WillPopScope(
+      onWillPop: () async {
+        await settings.write();
+        return true;
+      },
+      child: Scaffold(
+          appBar: AppBar(title: Text('Breezy Settings')),
+          body: SingleChildScrollView(
+              padding: EdgeInsets.all(5),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Input source:',
+                        style: Theme.of(context).textTheme.subhead),
+                    RadioListTile<InputSource>(
+                        title: const Text('USB Serial Port'),
+                        value: InputSource.serial,
+                        groupValue: settings.inputSource,
+                        onChanged: (v) => settings.inputSource = v),
+                    RadioListTile<InputSource>(
+                        title: const Text('Demo Log Data'),
+                        value: InputSource.assetFile,
+                        groupValue: settings.inputSource,
+                        onChanged: (v) => settings.inputSource = v),
+                    RadioListTile<InputSource>(
+                        title: const Text('Screen Debug Functions'),
+                        value: InputSource.screenDebug,
+                        groupValue: settings.inputSource,
+                        onChanged: (v) => settings.inputSource = v),
+                    PopupMenuButton<int>(
+                        child: ListTile(
+                          title: Text(
+                              'Port number ${settings.serialPortNumber}',
+                              style: Theme.of(context).textTheme.title.merge(
+                                  isSerial
+                                      ? null
+                                      : const TextStyle(color: Colors.grey))),
+                        ),
+                        onSelected: (v) => settings.serialPortNumber = v,
+                        enabled: isSerial,
+                        itemBuilder: _buildSerialPortMenu),
+                    PopupMenuButton<int>(
+                        child: ListTile(
+                          title: Text('Baud rate ${settings.baudRate}',
+                              style: Theme.of(context).textTheme.title.merge(
+                                  isSerial
+                                      ? null
+                                      : const TextStyle(color: Colors.grey))),
+                        ),
+                        onSelected: (v) => settings.baudRate = v,
+                        enabled: isSerial,
+                        itemBuilder: (context) => const [
+                              PopupMenuItem(value: 2400, child: Text('2400')),
+                              PopupMenuItem(value: 9600, child: Text('9600')),
+                              PopupMenuItem(value: 19200, child: Text('19200')),
+                              PopupMenuItem(value: 38400, child: Text('38400')),
+                              PopupMenuItem(
+                                  value: 115200, child: Text('115200')),
+                            ]),
+                    PopupMenuButton<bool>(
+                        child: ListTile(
+                          title: Text(
+                              'Meter incoming data by timestamp: ${settings.meterData}',
+                              style: Theme.of(context).textTheme.title.merge(
+                                  isSerial
+                                      ? null
+                                      : const TextStyle(color: Colors.grey))),
+                        ),
+                        onSelected: (v) => settings.meterData = v,
+                        enabled: isSerial,
+                        itemBuilder: (context) => const [
+                              PopupMenuItem(value: true, child: Text('true')),
+                              PopupMenuItem(value: false, child: Text('false'))
+                            ]),
+                  ]))),
+    );
   }
 
   List<PopupMenuEntry<int>> _buildSerialPortMenu(BuildContext context) {
