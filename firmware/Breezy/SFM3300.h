@@ -1,3 +1,7 @@
+#ifndef SFM3300_H
+#define SFM3300_H
+
+
 #include <inttypes.h>
 
 class SFM3300 {
@@ -11,3 +15,5 @@ class SFM3300 {
     private:
     long int slm_sum_raw;
 };
+
+#endif // #ifndef SFM3300_H

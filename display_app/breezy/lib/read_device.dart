@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show AssetBundle;
 import 'package:pedantic/pedantic.dart' show unawaited;
+import 'package:usb_serial/usb_serial.dart';
 
-import 'main.dart' show Log;
+import 'main.dart' show Log, Settings;
 import 'rolling_deque.dart' show TimedData;
+import 'spec.dart' as spec show DataFeed;
 import 'dart:typed_data';
 import 'dart:async' show Timer;
 import 'dart:math';
@@ -52,21 +54,32 @@ class DeviceData extends TimedData {
         displayedValues = null;
 }
 
+class DataFeed {
+  final int numberOfParts = 18;
+}
+
 abstract class DeviceDataListener {
   void processDeviceData(DeviceData d);
 }
 
 abstract class DeviceDataSource {
+  final spec.DataFeed feedSpec;
   DeviceDataListener _listener;
+
+  DeviceDataSource(this.feedSpec);
 
   /// A device data source for debugging the screen.  It produces data values
   /// expected to take the maximum screen width, logging values that go
   /// out of range, and stuff like that.
-  static DeviceDataSource screenDebug() => _ScreenDebugDeviceDataSource();
+  static DeviceDataSource screenDebug(Settings settings) =>
+      _ScreenDebugDeviceDataSource(settings);
 
   /// A source that reads from a file that's baked into the asset bundle
   static DeviceDataSource fromAssetFile(AssetBundle b, String name) =>
       _AssetFileDataSource(b, name);
+
+  static DeviceDataSource fromSerial(Settings settings) =>
+      _SerialDataSource(settings);
 
   @mustCallSuper
   void start(DeviceDataListener listener) {
@@ -84,12 +97,33 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
   static final int _cr = '\r'.codeUnitAt(0);
   static final int _newline = '\n'.codeUnitAt(0);
   static final int _hash = '#'.codeUnitAt(0);
-  final bool _meterReading;
+  final bool _meterData;
   final _lineBuffer = StringBuffer();
   int _lastTime; // Starts out null
   int _currTime = 0; // 64 bits
+  bool _stopped = false;
+  DateTime _startTime;
 
-  _ByteStreamDataSource(this._meterReading);
+  _ByteStreamDataSource(spec.DataFeed feed, this._meterData) : super(feed);
+
+  @override
+  start(DeviceDataListener listener) {
+    super.start(listener);
+    if (_meterData) {
+      _startTime = DateTime.now();
+    }
+    _stopped = false;
+    unawaited(readUntilStopped());
+  }
+
+  Future<void> readUntilStopped();
+
+  @override
+  void stop() {
+    super.stop();
+    _stopped = true;
+    _startTime = null;
+  }
 
   Future<void> receive(Uint8List data) async {
     for (int ch in data) {
@@ -131,7 +165,17 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
           displayed[i] = parts[pos++];
         }
         int checksum = int.parse(parts[pos++]);
-        // TODO:  Check checksum
+        if (checksum != -1) {
+          final crc = Crc16();
+          final lastComma = line.lastIndexOf(",");
+          for (int i = 0; i <= lastComma; i++) {
+            crc.addByte(line.codeUnitAt(i));
+          }
+          if (checksum != crc.result) {
+            Log.writeln(
+                'crc16 calculated:  ${crc.result} received:  $checksum');
+          }
+        }
         assert(pos == parts.length);
         if (_lastTime != null) {
           int deltaT = (time - _lastTime) & 0xffff;
@@ -139,9 +183,13 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
             throw Exception('bad deltaT:  $deltaT <= 0');
           }
           _currTime += deltaT;
-          if (_meterReading) {
-            waited = true;
-            await Future.delayed(Duration(milliseconds: deltaT), () => null);
+          if (_meterData) {
+            int now = DateTime.now().difference(_startTime).inMilliseconds;
+            int dNow = _currTime - now;
+            if (dNow > 0) {
+              waited = true;
+              await Future.delayed(Duration(milliseconds: dNow), () => null);
+            }
           }
         }
         _lastTime = time;
@@ -167,15 +215,10 @@ class _AssetFileDataSource extends _ByteStreamDataSource {
   final String _name;
   bool _stopped = false;
 
-  _AssetFileDataSource(this._bundle, this._name) : super(true);
+  _AssetFileDataSource(this._bundle, this._name)
+      : super(spec.DataFeed.defaultFeed, true);
 
   @override
-  start(DeviceDataListener listener) {
-    super.start(listener);
-    _stopped = false;
-    unawaited(readUntilStopped());
-  }
-
   Future<void> readUntilStopped() async {
     while (!_stopped) {
       ByteData d = await _bundle.load(_name);
@@ -186,12 +229,82 @@ class _AssetFileDataSource extends _ByteStreamDataSource {
   }
 }
 
+class _SerialDataSource extends _ByteStreamDataSource {
+  final int baudRate;
+  final int portNumber;
+  UsbPort _port;
+
+  _SerialDataSource(Settings settings)
+      : this.baudRate = settings.baudRate,
+        this.portNumber = settings.serialPortNumber,
+        super(settings.dataFeedSpec, settings.meterData);
+
+  @override
+  void stop() {
+    super.stop();
+    if (_port != null) {
+      try {
+        _port.close();
+        _port = null;
+      } catch (ex) {
+        Log.writeln("Error closing serial port:  $ex");
+      }
+    }
+  }
+
+  @override
+  Future<void> readUntilStopped() async {
+    List<UsbDevice> devices = await UsbSerial.listDevices();
+    try {
+      if (_stopped) {
+        return;
+      }
+      _port = await devices[portNumber - 1].create();
+      if (_stopped) {
+        return;
+      }
+      if (!(await _port.open())) {
+        throw Exception("Failed to open device.");
+      }
+      if (_stopped) {
+        return;
+      }
+      await _port.setDTR(true);
+      if (_stopped) {
+        return;
+      }
+      await _port.setRTS(true);
+      if (_stopped) {
+        return;
+      }
+      await _port.setPortParameters(baudRate, UsbPort.DATABITS_8,
+          UsbPort.STOPBITS_1, UsbPort.PARITY_NONE);
+      if (_stopped) {
+        return;
+      }
+      _port.inputStream.listen((Uint8List event) async {
+        if (_stopped) {
+          return;
+        }
+        await receive(event);
+      });
+    } catch (ex) {
+      Log.writeln('Serial error: $ex');
+    }
+  }
+}
+
 class _ScreenDebugDeviceDataSource extends DeviceDataSource {
   Timer _timer;
   static final _random = Random();
   double _currTime = 0;
+  final List<double> lastValue;
+  final List<double> nextChange;
 
-  _ScreenDebugDeviceDataSource();
+  _ScreenDebugDeviceDataSource(Settings settings)
+      : lastValue = Float64List(settings.dataFeedSpec.displayedValues.length),
+        nextChange = Float64List(settings.dataFeedSpec.displayedValues.length),
+        super(settings.dataFeedSpec);
 
   @override
   void start(DeviceDataListener listener) {
@@ -210,22 +323,92 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
   void _tick() {
     final charted = Float64List(3);
     final frobbed = _currTime.remainder(3.7);
+    // TODO:  Use the spec for charted values
     charted[0] = _random.nextDouble() * 5 + (frobbed < 1.5 ? -80 : 90);
     charted[1] = (frobbed < 1.5 ? frobbed * 50 : -99);
-    charted[2] = 500.0 + 550 * sin(_currTime); // Some out of range
-    final displayed = List<String>(11);
-    displayed[0] = "MM.M"; // 'M' is usually the widest character
-    displayed[1] = "MM.M";
-    displayed[2] = "MM.M";
-    displayed[3] = "MM.M";
-    displayed[4] = "1MM";
-    displayed[5] = "MM.M";
-    displayed[6] = "MM.M";
-    displayed[7] = "MM.M";
-    displayed[8] = "MM.M";
-    displayed[9] = "MMMM";
-    displayed[10] = "MMMM";
+    charted[2] = 550 * sin(_currTime); // Some out of range
+    final displayed = List<String>(feedSpec.displayedValues.length);
+    for (int i = 0; i < displayed.length; i++) {
+      final spec = feedSpec.displayedValues[i];
+      if (_currTime >= nextChange[i]) {
+        nextChange[i] = _currTime + _random.nextDouble() * 4;
+        if (_random.nextDouble() < 0.2) {
+          // Go to min or max value 20% of the time
+          if (_random.nextDouble() < 0.5) {
+            lastValue[i] = spec.minValue;
+          } else {
+            lastValue[i] = spec.maxValue;
+          }
+        } else {
+          lastValue[i] = spec.minValue +
+              (spec.maxValue - spec.minValue) * _random.nextDouble();
+        }
+      }
+      displayed[i] = spec.format.format(lastValue[i]);
+    }
     _listener?.processDeviceData(DeviceData(_currTime, charted, displayed));
     _currTime += 0.020;
+  }
+}
+
+/// Calculate a CRC-16 checksum according to CRC-16-CCITT
+/// cf. https://en.wikipedia.org/wiki/Cyclic_redundancy_check
+/// Translated from the C code at http://srecord.sourceforge.net/crc16-ccitt.html#source
+///
+/// Usage:  ```
+///     int expected = ...;
+///     var checksum = Crc16();
+///     checksum.addByte(...)
+///     checksum.addByte(...)
+///     checksum.addByte(...)
+///        ...
+///     if (checksum.result != expected) {
+///         ...
+///     }
+///  ```
+class Crc16 {
+  static const int _poly = 0x1021; // crc-ccitt mask
+  int _crc = 0xffff;
+
+  void reset() {
+    _crc = 0xffff;
+  }
+
+  void addByte(int ch) {
+    int v = 0x80;
+    for (int i = 0; i < 8; i++) {
+      final bool xor = _crc & 0x8000 != 0;
+      _crc <<= 1;
+      _crc &= 0xffff;
+      if (ch & v != 0) {
+        // Append next bit of message to end of CRC if it is not zero.
+        // The zero bit placed there by the shift above need not be
+        // changed if the next bit of the message is zero.
+        _crc++;
+        _crc &= 0xffff;
+      }
+      if (xor) {
+        _crc = _crc ^ _poly;
+      }
+      // Align test bit with next bit of message byte
+      v >>= 1;
+    }
+  }
+
+  // Called augument_message_for_good_crc() in
+  // http://srecord.sourceforge.net/crc16-ccitt.html#source
+  /// Get the result.  It's OK to call this multiple times, even if
+  /// data is added in between.
+  int get result {
+    int result = _crc;
+    for (int i = 0; i < 16; i++) {
+      bool xor = result & 0x8000 != 0;
+      result <<= 1;
+      result &= 0xffff;
+      if (xor) {
+        result = result ^ _poly;
+      }
+    }
+    return result;
   }
 }

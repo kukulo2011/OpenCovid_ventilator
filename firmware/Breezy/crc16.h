@@ -1,3 +1,7 @@
+#ifndef CRC16_H
+#define CRC16_H
+
+
 #include <Arduino.h>
 
 class CRC16
@@ -14,3 +18,7 @@ class CRC16
 };
 
 extern CRC16 Crc16;
+
+
+
+#endif // #ifndef CRC16_H

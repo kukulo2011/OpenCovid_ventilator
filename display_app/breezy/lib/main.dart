@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:pedantic/pedantic.dart';
 import 'dart:io' show exit, stdout;
 import 'serial_test.dart';
 import 'graphs_screen.dart';
 import 'read_device.dart';
+import 'settings_screen.dart';
+import 'spec.dart' as spec show DataFeed;
 
 /*
 MIT License
@@ -41,6 +44,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      // debugShowCheckedModeBanner: false,
       title: 'Breezy Prototype',
       theme: ThemeData(
         primarySwatch: Colors.blue,
@@ -50,46 +54,183 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class BreezyHomePage extends StatelessWidget {
+class BreezyHomePage extends StatefulWidget {
   final String _title;
 
   BreezyHomePage({Key key, String title})
-    : this._title = title, super(key: key);
+      : this._title = title,
+        super(key: key);
+
+  @override
+  _BreezyHomePageState createState() => _BreezyHomePageState();
+}
+
+class _BreezyHomePageState extends State<BreezyHomePage>
+    implements SettingsListener {
+  final Settings settings = Settings();
+
+  @override
+  void initState() {
+    super.initState();
+    settings.listeners.add(this);
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    settings.listeners.remove(this);
+  }
 
   @override
   Widget build(BuildContext context) {
     const bigTextStyle = TextStyle(fontSize: 20);
     return Scaffold(
         appBar: AppBar(
-          title: Text(_title),
+          title: Text(widget._title),
           actions: <Widget>[
-            IconButton(
-              icon: Icon(Icons.power_settings_new),
-              tooltip: 'Quit',
-              onPressed: () { exit(0); }
-            )],
-    ),
-    body: Center(
-            child: Column(children: <Widget>[
-          const SizedBox(height: 50),
-          RaisedButton(
-              child: const Text('Test Serial Connection', style: bigTextStyle),
-              onPressed: () {
-                Navigator.push<void>(context,
-                    MaterialPageRoute(builder: (context) => SerialTestPage()));
-              }),
-          const SizedBox(height: 30),
-          RaisedButton(
-            child: const Text('Show Fake Graphs', style: bigTextStyle),
-            onPressed: () {
-              Navigator.push<void>(context,
-              MaterialPageRoute(builder: (context) => GraphsScreen(
-                // dataSource: DeviceDataSource.screenDebug()
-                dataSource: DeviceDataSource.fromAssetFile(
-                  DefaultAssetBundle.of(context), "assets/demo.log"
+            PopupMenuButton<void Function()>(
+                // icon: Icon(Icons.menu),
+                // tooltip: 'Menu',
+                onSelected: (f) => f(),
+                itemBuilder: (BuildContext context) {
+                  return [
+                    PopupMenuItem<void Function()>(
+                        value: () async {
+                          var ss = SettingsScreen(settings);
+                          await ss.init();
+                          unawaited(Navigator.push<void>(context,
+                              MaterialPageRoute(builder: (context) => ss)));
+                        },
+                        child: Row(
+                          children: <Widget>[
+                            Text('Settings'),
+                            Spacer(),
+                            Icon(Icons.settings, color: Colors.black)
+                          ],
+                        )),
+                    PopupMenuItem(
+                        value: () => exit(0),
+                        child: Row(children: [
+                          Text('Quit'),
+                          Spacer(),
+                          Icon(Icons.power_settings_new, color: Colors.black),
+                        ])),
+                  ];
+                }
+//              icon: Icon(Icons.power_settings_new),
+//              tooltip: 'Quit',
+//              onPressed: () { exit(0); }
                 )
-              )));
-            }),
-        ])));
+          ],
+        ),
+        body: Builder(
+          builder: (context) => Center(
+              child: Column(children: <Widget>[
+            const SizedBox(height: 50),
+            RaisedButton(
+                child:
+                    const Text('Test Serial Connection', style: bigTextStyle),
+                onPressed: () {
+                  Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => SerialTestPage(settings)));
+                }),
+            const SizedBox(height: 30),
+            RaisedButton(
+                child: const Text('Show Graph Screen', style: bigTextStyle),
+                onPressed: () async {
+                  DeviceDataSource src = _createDataSource(context);
+                  if (src != null) {
+                    unawaited(Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => GraphsScreen(
+                                // dataSource: DeviceDataSource.screenDebug()
+                                dataSource: src))));
+                  }
+                }),
+          ])),
+        ));
   }
+
+  DeviceDataSource _createDataSource(BuildContext context) {
+    switch (settings.inputSource) {
+      case InputSource.serial:
+        try {
+          return DeviceDataSource.fromSerial(settings);
+        } catch (ex) {
+          Scaffold.of(context).showSnackBar(
+              SnackBar(content: Text('Error with serial port:  $ex')));
+        }
+
+        break;
+      case InputSource.assetFile:
+        return DeviceDataSource.fromAssetFile(
+            DefaultAssetBundle.of(context), "assets/demo.log");
+      case InputSource.screenDebug:
+        return DeviceDataSource.screenDebug(settings);
+    }
+    return null;
+  }
+
+  @override
+  void settingsChanged() {
+    setState(() {});
+  }
+}
+
+enum InputSource { serial, screenDebug, assetFile }
+
+abstract class SettingsListener {
+  void settingsChanged();
+}
+
+class Settings {
+  final listeners = List<SettingsListener>();
+
+  void _notify() {
+    for (var w in listeners) {
+      w.settingsChanged();
+    }
+  }
+
+  InputSource _inputSource = InputSource.assetFile;
+  InputSource get inputSource => _inputSource;
+  set inputSource(InputSource v) {
+    _inputSource = v;
+    _notify();
+  }
+
+  /// 1..n, or 0 if none selected
+  int _serialPortNumber = 1;
+  int get serialPortNumber => _serialPortNumber;
+  set serialPortNumber(int v) {
+    _serialPortNumber = v;
+    _notify();
+  }
+
+  int _baudRate = 115200;
+  int get baudRate => _baudRate;
+  set baudRate(int v) {
+    _baudRate = v;
+    _notify();
+  }
+
+  bool _meterData = true;
+  bool get meterData {
+    final v = _inputSource;
+    if (v == InputSource.screenDebug || v == InputSource.assetFile) {
+      return true;
+    } else {
+      return _meterData;
+    }
+  }
+  set meterData(bool v) {
+    _meterData = v;
+    _notify();
+  }
+
+  // TODO:  Get from current appilcation spec
+  final spec.DataFeed dataFeedSpec = spec.DataFeed.defaultFeed;
 }

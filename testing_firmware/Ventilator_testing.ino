@@ -16,6 +16,7 @@ float O2conc=35;
 float VTo=1254.21;
 float VTi=1245;
 float MVo=1100;
+float MV2=1005;
  
 void setup() {
   Serial.begin(115200);
@@ -51,6 +52,8 @@ void loop() {
   Serial.print(VTi, 1);
   Serial.print(","); 
   Serial.print(MVo, 1);
+  Serial.print(",");
+  Serial.print(MV2, 1);
   Serial.print(",");
   Serial.print("-1"); 
   Serial.println();
