@@ -45,12 +45,12 @@ final _displayedValues = [
   DisplayedValueSelector('Pmean', 'mbar', '##.#', Colors.orange.shade300, 1),
   DisplayedValueSelector('PEEP', 'mbar', '##.#', Colors.orange.shade300, 2),
   DisplayedValueSelector('RR', 'b/min', '##.#', Colors.lightGreen, 3),
-  DisplayedValueSelector('O2', '%', '1##', Colors.lightGreen, 4),
+  DisplayedValueSelector('O2', '     %', '1##', Colors.lightGreen, 4),
   DisplayedValueSelector('Ti', 's', '##.#', Colors.lightGreen, 5),
-  DisplayedValueSelector('I:E', '', '##.#', Colors.lightGreen, 6),
+  DisplayedValueSelector('I:E', null, '##.#', Colors.lightGreen, 6),
   DisplayedValueSelector('MVi', 'l/min', '##.#', Colors.lightBlue, 7),
   DisplayedValueSelector('MVe', 'l/min', '##.#', Colors.lightBlue, 8),
-  DisplayedValueSelector('VTi', '', '####', Colors.lightBlue, 9),
+  DisplayedValueSelector('VTi', null, '####', Colors.lightBlue, 9),
   DisplayedValueSelector('VTe', 'ml', '####', Colors.lightBlue, 10)
 ];
 
