@@ -1,5 +1,5 @@
-# OpenCovid_ventilator
-Open source ventilator
+# OpenCovid19 emergency ventilator
+Open source emergency ventilator
 
 This repository contains resources for
 [Breezy, the crisis emergency ventilator](https://app.jogl.io/project/151)
