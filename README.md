@@ -10,5 +10,8 @@ the [Code Life Ventilator Challenge](https://www.agorize.com/en/challenges/code-
 
 Components:
 
- - [Display App](./display_app/README.md)
+ - [Display App](./display_app/README.md) - Breezy Android application for displaying values from emergency ventilator
 
+ - [Arduino firmware](./firmware) - board firmware for emergency ventilator
+ 
+ - [Testing firmware](./testing_firmware) - for testing application without need of ventilator
