@@ -15,3 +15,10 @@ Components:
  - [Arduino firmware](./firmware) - board firmware for emergency ventilator
  
  - [Testing firmware](./testing_firmware) - for testing application without need of ventilator
+
+
+ Project description:   https://www.youtube.com/watch?v=n5tFK2mwJQI
+   
+ Serial test of application: https://www.youtube.com/watch?v=B80z6uqWW1w
+   
+   
