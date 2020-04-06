@@ -7,7 +7,7 @@ import 'serial_test.dart';
 import 'graphs_screen.dart';
 import 'read_device.dart';
 import 'settings_screen.dart';
-import 'spec.dart' as spec show DataFeed;
+import 'configure.dart' as config;
 
 /*
 MIT License
@@ -69,39 +69,45 @@ class BreezyHomePage extends StatefulWidget {
   _BreezyHomePageState createState() => _BreezyHomePageState();
 }
 
+class BreezyGlobals {
+  final Settings settings = Settings();
+  config.BreezyConfiguration configuration =
+      config.BreezyConfiguration.defaultConfig;
+}
+
 class _BreezyHomePageState extends State<BreezyHomePage>
     implements SettingsListener {
-  final Settings settings = Settings();
+  final globals = BreezyGlobals();
 
   @override
   void initState() {
     super.initState();
-    settings.listeners.add(this);
+    globals.settings.listeners.add(this);
   }
 
   Future<void> readSettings() async {
     if (Settings.settingsFile == null) {
       Directory dir = await getApplicationSupportDirectory();
       Settings.settingsFile = File("${dir.path}/settings.json");
-      await settings.read();
+      await globals.settings.read();
     }
   }
 
   @override
   void dispose() {
     super.dispose();
-    settings.listeners.remove(this);
+    globals.settings.listeners.remove(this);
   }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
-      future: readSettings(),
-      builder: (context, snapshot) {
-        return doBuild(context);
-      }
-    );
+        future: readSettings(),
+        builder: (context, snapshot) {
+          return doBuild(context);
+        });
   }
+
   Widget doBuild(BuildContext context) {
     const bigTextStyle = TextStyle(fontSize: 20);
     return Scaffold(
@@ -116,7 +122,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                   return [
                     PopupMenuItem<void Function()>(
                         value: () async {
-                          var ss = SettingsScreen(settings);
+                          var ss = SettingsScreen(globals.settings);
                           await ss.init();
                           unawaited(Navigator.push<void>(context,
                               MaterialPageRoute(builder: (context) => ss)));
@@ -154,13 +160,15 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                   Navigator.push<void>(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => SerialTestPage(settings)));
+                          builder: (context) =>
+                              SerialTestPage(globals.settings)));
                 }),
             const SizedBox(height: 30),
             RaisedButton(
                 child: const Text('Show Graph Screen', style: bigTextStyle),
                 onPressed: () async {
-                  DeviceDataSource src = _createDataSource(context);
+                  DeviceDataSource src =
+                      _createDataSource(globals.configuration.feed, context);
                   if (src != null) {
                     unawaited(Navigator.push<void>(
                         context,
@@ -174,11 +182,13 @@ class _BreezyHomePageState extends State<BreezyHomePage>
         ));
   }
 
-  DeviceDataSource _createDataSource(BuildContext context) {
-    switch (settings.inputSource) {
+  DeviceDataSource _createDataSource(
+      config.DataFeed feed, BuildContext context) {
+    switch (globals.settings.inputSource) {
       case InputSource.serial:
         try {
-          return DeviceDataSource.fromSerial(settings);
+          return DeviceDataSource.fromSerial(
+              globals.settings, globals.configuration.feed);
         } catch (ex) {
           Scaffold.of(context).showSnackBar(
               SnackBar(content: Text('Error with serial port:  $ex')));
@@ -187,9 +197,9 @@ class _BreezyHomePageState extends State<BreezyHomePage>
         break;
       case InputSource.assetFile:
         return DeviceDataSource.fromAssetFile(
-            DefaultAssetBundle.of(context), "assets/demo.log");
+            feed, DefaultAssetBundle.of(context), "assets/demo.log");
       case InputSource.screenDebug:
-        return DeviceDataSource.screenDebug(settings);
+        return DeviceDataSource.screenDebug(globals.configuration.feed);
     }
     return null;
   }
@@ -201,7 +211,6 @@ class _BreezyHomePageState extends State<BreezyHomePage>
 }
 
 enum InputSource { serial, screenDebug, assetFile }
-// NB:  Index is written in JSON format
 
 abstract class SettingsListener {
   void settingsChanged();
@@ -244,10 +253,10 @@ class Settings {
 
   Future<void> write() async {
     final json = {
-      'inputSource' : _inputSource.toString(),
-      'serialPortNumber' : _serialPortNumber,
-      'baudRate' : _baudRate,
-      'meterData' : _meterData
+      'inputSource': _inputSource.toString(),
+      'serialPortNumber': _serialPortNumber,
+      'baudRate': _baudRate,
+      'meterData': _meterData
     };
     final str = convert.json.encode(json);
     await settingsFile.writeAsString(str);
@@ -286,11 +295,9 @@ class Settings {
       return _meterData;
     }
   }
+
   set meterData(bool v) {
     _meterData = v;
     _notify();
   }
-
-  // TODO:  Get from current application spec, and remove from here.
-  final spec.DataFeed dataFeedSpec = spec.DataFeed.defaultFeed;
 }

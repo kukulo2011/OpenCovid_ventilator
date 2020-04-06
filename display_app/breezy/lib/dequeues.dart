@@ -24,11 +24,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
+abstract class TimedData {
+  /// Time in milliseconds
+  double get timeMS;
+}
+
 /// An efficient implementation of a Deque for "rolling" data.  Customers must
 /// append data to this dequeue in ascending order.  As data is appended, old
 /// data is purged from the beginning.  Bookkeeping is done to efficiently
 /// provide a view of the data within a stable "window" where the data rolls
-/// forward, as is needed by RollingChart - see [rollingWindow]
+/// forward, as is needed by RollingChart - see [window]
 ///
 /// The dequeue always contains one dummy element.  This works out for
 /// RollingChart, because it needs a dummy element with null values to
@@ -44,7 +49,7 @@ class RollingDeque<T extends TimedData> {
   int length = 1;
   int _firstIndex = 0;
   int _minElementIndex = 0; // Index into RollingDeque, not _list.
-  List<T> _rollingWindow;
+  List<T> _window;
 
   RollingDeque(
       int maxElements, this.windowSize, this._gapSize, this._dummyFactory)
@@ -54,7 +59,7 @@ class RollingDeque<T extends TimedData> {
 
   /// Append e to the list, while enforcing the window size and gap.
   void append(T e) {
-    _rollingWindow = null; // Invalidate cached value
+    _window = null; // Invalidate cached value
     assert(length == 1 || this[length - 2].timeMS < e.timeMS);
     double earliestValid = e.timeMS - (windowSize - _gapSize);
     while (length > 1 && this[0].timeMS < earliestValid) {
@@ -91,28 +96,13 @@ class RollingDeque<T extends TimedData> {
     return _list[(_firstIndex + index) % _list.length];
   }
 
-  /// Give the current valid value.  This is the second-to-last value
-  /// on the list, since the last value is a dummy value.
-  T get current {
-    if (length < 2) {
-      return null;
-    } else {
-      return this[length-2];
-    }
-  }
-
   /// Give a view of the data within the window needed by a rolling display.
   /// In other words, give a view sorted by time.remainder(windowSize).
-  List<T> get rollingWindow {
-    _rollingWindow ??= _RollingDequeWindowIterable(this, _minElementIndex)
+  List<T> get window {
+    _window ??= _RollingDequeWindowIterable(this, _minElementIndex)
         .toList(growable: false);
-    return _rollingWindow;
+    return _window;
   }
-}
-
-abstract class TimedData {
-  /// Time in milliseconds
-  double get timeMS;
 }
 
 class _RollingDequeWindowIterable<T extends TimedData> extends IterableBase<T> {
@@ -137,6 +127,89 @@ class _RollingDequeWindowIterator<T extends TimedData> implements Iterator<T> {
       return null;
     } else {
       return _di._deque[(_di._startIndex + _currIndex) % _di._deque.length];
+    }
+  }
+
+  @override
+  bool moveNext() {
+    if (_currIndex == _di._deque.length) {
+      return false;
+    } else {
+      _currIndex++;
+      return _currIndex != _di._deque.length;
+    }
+  }
+}
+
+/// An efficient implementation of a Deque for "sliding" data.  Customers must
+/// append data to this dequeue in ascending order.  As data is appended, old
+/// data is purged from the beginning.
+///
+/// This class uses assertions to validate that out-of-order elements are
+/// not added.
+class SlidingDeque<T extends TimedData> {
+  final List<T> _list;
+  final double windowSize;
+  int length = 0;
+  int _firstIndex = 0;
+  List<T> _window;
+
+  SlidingDeque(int maxElements, this.windowSize)
+      : this._list = List<T>(maxElements);
+
+  /// Append e to the list, while enforcing the window size and gap.
+  void append(T e) {
+    _window = null; // Invalidate cached value
+    assert(length == 0 || this[length - 1].timeMS < e.timeMS);
+    double earliestValid = e.timeMS - windowSize;
+    while (length > 0 && this[0].timeMS < earliestValid) {
+      _list[_firstIndex++] = null;
+      _firstIndex %= _list.length;
+      length--;
+    }
+    assert(length < _list.length);
+    _list[(_firstIndex + length++) % _list.length] = e;
+  }
+
+  T get last => this[length - 1];
+  T get first => this[0];
+
+  T operator [](int index) {
+    if (index < 0 || index >= length) {
+      throw StateError('Illegal index $index');
+    }
+    return _list[(_firstIndex + index) % _list.length];
+  }
+
+  /// Give a view of the data within the window needed by a sliding display.
+  List<T> get window {
+    _window ??= _SlidingDequeWindowIterable(this)
+        .toList(growable: false);
+    return _window;
+  }
+}
+
+class _SlidingDequeWindowIterable<T extends TimedData> extends IterableBase<T> {
+  final SlidingDeque<T> _deque;
+
+  _SlidingDequeWindowIterable(this._deque);
+
+  @override
+  Iterator<T> get iterator => _SlidingDequeWindowIterator(this);
+}
+
+class _SlidingDequeWindowIterator<T extends TimedData> implements Iterator<T> {
+  final _SlidingDequeWindowIterable<T> _di;
+  int _currIndex = -1;
+
+  _SlidingDequeWindowIterator(this._di);
+
+  @override
+  T get current {
+    if (_currIndex == -1 || _currIndex == _di._deque.length) {
+      return null;
+    } else {
+      return _di._deque[_currIndex];
     }
   }
 

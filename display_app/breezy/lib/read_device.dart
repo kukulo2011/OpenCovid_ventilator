@@ -4,8 +4,8 @@ import 'package:pedantic/pedantic.dart' show unawaited;
 import 'package:usb_serial/usb_serial.dart';
 
 import 'main.dart' show Log, Settings;
-import 'rolling_deque.dart' show TimedData;
-import 'spec.dart' as spec;
+import 'dequeues.dart' show TimedData;
+import 'configure.dart' as config;
 import 'dart:typed_data';
 import 'dart:async' show Timer;
 import 'dart:math';
@@ -37,25 +37,27 @@ SOFTWARE.
 // Code to read device data goes here
 
 /// Data from the device
-class DeviceData extends TimedData {
-  @override
-  final double timeMS;
-  final Float64List chartedValues;
+class DeviceData {
   final List<String> displayedValues;
+  final ChartData chart;
 
-  DeviceData(this.timeMS, this.chartedValues, this.displayedValues) {
-    assert(timeMS != null);
-    assert(chartedValues.length == 3);
+  DeviceData(double timeMS, Float64List chartedValues, this.displayedValues)
+      : chart = ChartData(timeMS, chartedValues) {
     assert(displayedValues.length == 11);
   }
-
-  DeviceData.dummy(this.timeMS)
-      : chartedValues = null,
-        displayedValues = null;
 }
 
-class DataFeed {
-  final int numberOfParts = 18;
+class ChartData extends TimedData {
+  final Float64List values;
+  @override
+  final double timeMS;
+
+  ChartData(this.timeMS, this.values) {
+    assert(timeMS != null);
+    assert(values != null);
+  }
+
+  ChartData.dummy(this.timeMS) : values = null;
 }
 
 abstract class DeviceDataListener {
@@ -63,7 +65,7 @@ abstract class DeviceDataListener {
 }
 
 abstract class DeviceDataSource {
-  final spec.DataFeed feedSpec;
+  final config.DataFeed feedSpec;
   DeviceDataListener _listener;
 
   DeviceDataSource(this.feedSpec);
@@ -71,15 +73,16 @@ abstract class DeviceDataSource {
   /// A device data source for debugging the screen.  It produces data values
   /// expected to take the maximum screen width, logging values that go
   /// out of range, and stuff like that.
-  static DeviceDataSource screenDebug(Settings settings) =>
-      _ScreenDebugDeviceDataSource(settings);
+  static DeviceDataSource screenDebug(config.DataFeed feed) =>
+      _ScreenDebugDeviceDataSource(feed);
 
   /// A source that reads from a file that's baked into the asset bundle
-  static DeviceDataSource fromAssetFile(AssetBundle b, String name) =>
-      _AssetFileDataSource(b, name);
+  static DeviceDataSource fromAssetFile(
+          config.DataFeed feed, AssetBundle b, String name) =>
+      _AssetFileDataSource(feed, b, name);
 
-  static DeviceDataSource fromSerial(Settings settings) =>
-      _SerialDataSource(settings);
+  static DeviceDataSource fromSerial(Settings settings, config.DataFeed feed) =>
+      _SerialDataSource(settings, feed);
 
   @mustCallSuper
   void start(DeviceDataListener listener) {
@@ -104,7 +107,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
   bool _stopped = false;
   DateTime _startTime;
 
-  _ByteStreamDataSource(spec.DataFeed feed, this._meterData) : super(feed);
+  _ByteStreamDataSource(config.DataFeed feed, this._meterData) : super(feed);
 
   @override
   start(DeviceDataListener listener) {
@@ -215,8 +218,8 @@ class _AssetFileDataSource extends _ByteStreamDataSource {
   final String _name;
   bool _stopped = false;
 
-  _AssetFileDataSource(this._bundle, this._name)
-      : super(spec.DataFeed.defaultFeed, true);
+  _AssetFileDataSource(config.DataFeed feed, this._bundle, this._name)
+      : super(feed, true);
 
   @override
   Future<void> readUntilStopped() async {
@@ -234,10 +237,10 @@ class _SerialDataSource extends _ByteStreamDataSource {
   final int portNumber;
   UsbPort _port;
 
-  _SerialDataSource(Settings settings)
+  _SerialDataSource(Settings settings, config.DataFeed feed)
       : this.baudRate = settings.baudRate,
         this.portNumber = settings.serialPortNumber,
-        super(settings.dataFeedSpec, settings.meterData);
+        super(feed, settings.meterData);
 
   @override
   void stop() {
@@ -294,7 +297,8 @@ class _SerialDataSource extends _ByteStreamDataSource {
   }
 }
 
-typedef _ScreenDebugFunction = double Function(double time, spec.ChartedValue);
+typedef _ScreenDebugFunction = double Function(
+    double time, config.ChartedValue);
 
 class _ScreenDebugDeviceDataSource extends DeviceDataSource {
   Timer _timer;
@@ -307,7 +311,7 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
   // A selection of pretty-looking functions.  They're in a list so we
   // can randomly pick different ones each time we run.
   static List<_ScreenDebugFunction> functions = [
-    (double time, spec.ChartedValue spec) {
+    (double time, config.ChartedValue spec) {
       final range = spec.maxValue - spec.minValue;
       final frobbed = time.remainder(3.7);
       return _random.nextDouble() * range / 50 +
@@ -315,23 +319,24 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
               ? spec.minValue + range / 20
               : spec.maxValue - range / 20);
     },
-    (double time, spec.ChartedValue spec) {
+    (double time, config.ChartedValue spec) {
       final range = spec.maxValue - spec.minValue;
       final frobbed = time.remainder(3.7);
-      return (frobbed < 1.5 ? range * frobbed / 1.5  : 0.0) + spec.minValue;
+      return (frobbed < 1.5 ? range * frobbed / 1.5 : 0.0) + spec.minValue;
     },
-    (double time, spec.ChartedValue spec) {
+    (double time, config.ChartedValue spec) {
       final range = spec.maxValue - spec.minValue;
-      return range * (0.5 + 0.55 * sin(time)) + spec.minValue; // Some out of range
+      return range * (0.5 + 0.55 * sin(time)) +
+          spec.minValue; // Some out of range
     },
   ];
 
-  _ScreenDebugDeviceDataSource(Settings settings)
-      : lastValue = Float64List(settings.dataFeedSpec.displayedValues.length),
-        nextChange = Float64List(settings.dataFeedSpec.displayedValues.length),
-        super(settings.dataFeedSpec) {
+  _ScreenDebugDeviceDataSource(config.DataFeed feed)
+      : lastValue = Float64List(feed.displayedValues.length),
+        nextChange = Float64List(feed.displayedValues.length),
+        super(feed) {
     final candidates = List<_ScreenDebugFunction>();
-    for (final spec.ChartedValue _ in feedSpec.chartedValues) {
+    for (final config.ChartedValue _ in feedSpec.chartedValues) {
       if (candidates.isEmpty) {
         candidates.addAll(functions);
       }
