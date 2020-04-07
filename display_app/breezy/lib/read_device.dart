@@ -6,6 +6,7 @@ import 'package:usb_serial/usb_serial.dart';
 import 'main.dart' show Log, Settings;
 import 'dequeues.dart' show TimedData;
 import 'configure.dart' as config;
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:async' show Timer;
 import 'dart:math';
@@ -84,6 +85,10 @@ abstract class DeviceDataSource {
   static DeviceDataSource fromSerial(Settings settings, config.DataFeed feed) =>
       _SerialDataSource(settings, feed);
 
+  static DeviceDataSource serverSocket(
+          Settings settings, config.DataFeed feed) =>
+      _ServerSocketDataSource(settings, feed);
+
   @mustCallSuper
   void start(DeviceDataListener listener) {
     assert(listener != null);
@@ -112,9 +117,6 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
   @override
   start(DeviceDataListener listener) {
     super.start(listener);
-    if (_meterData) {
-      _startTime = DateTime.now();
-    }
     _stopped = false;
     unawaited(readUntilStopped());
   }
@@ -147,7 +149,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
       await Future.delayed(Duration(microseconds: 250), () => null);
       return;
     }
-    bool waited = false;
+    int unwaited = 0;
     List<String> parts = line.split(',');
     try {
       if (parts.length != 18) {
@@ -180,17 +182,21 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
           }
         }
         assert(pos == parts.length);
+        if (_meterData && _startTime == null) {
+          _startTime = DateTime.now();
+        }
         if (_lastTime != null) {
           int deltaT = (time - _lastTime) & 0xffff;
           if (deltaT <= 0) {
             throw Exception('bad deltaT:  $deltaT <= 0');
           }
           _currTime += deltaT;
+          unwaited++;
           if (_meterData) {
             int now = DateTime.now().difference(_startTime).inMilliseconds;
             int dNow = _currTime - now;
             if (dNow > 0) {
-              waited = true;
+              unwaited--;
               await Future.delayed(Duration(milliseconds: dNow), () => null);
             }
           }
@@ -207,7 +213,12 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
     // the application stands a chance of remaining responsive.  In normal
     // operation, a line of about 100 characters comes every 20ms, so this
     // slight delay will have no effect.
-    if (!waited) {
+    if (unwaited > 10) {
+      // If we're on a slow device, we want to catch up as much as possible
+      // before updating the screen.  Lacking anything like thread prioriries,
+      // this can't be done reliably, but we can at least try to process 10
+      // samples at a time if we're really behind.
+      unwaited = 0;
       await Future.delayed(Duration(microseconds: 250), () => null);
     }
   }
@@ -293,6 +304,92 @@ class _SerialDataSource extends _ByteStreamDataSource {
       });
     } catch (ex) {
       Log.writeln('Serial error: $ex');
+    }
+  }
+}
+
+class _ServerSocketDataSource extends _ByteStreamDataSource {
+  final int portNumber;
+  final String securityString;
+  ServerSocket serverSocket;
+  Socket readingFrom;
+  bool firstLineMatched = false;
+
+  _ServerSocketDataSource(Settings settings, config.DataFeed feed)
+      : this.portNumber = settings.socketPort,
+        this.securityString = settings.securityString,
+        super(feed, settings.meterData);
+
+  @override
+  void stop() {
+    super.stop();
+    if (serverSocket != null) {
+      unawaited(serverSocket.close());
+      serverSocket = null;
+    }
+    if (readingFrom != null) {
+      unawaited(readingFrom.close());
+      readingFrom = null;
+    }
+  }
+
+  @override
+  Future<void> readUntilStopped() async {
+    if (_stopped) {
+      return;
+    }
+    serverSocket = await ServerSocket.bind(InternetAddress.anyIPv4, portNumber);
+    // That allows IPv6 too.
+    // https://api.flutter.dev/flutter/dart-io/ServerSocket/bind.html
+    if (_stopped) {
+      if (serverSocket != null) {
+        unawaited(serverSocket.close());
+        serverSocket = null;
+      }
+      return;
+    }
+    serverSocket.listen((Socket socket) {
+      if (readingFrom != null) {
+        socket.add('Already reading data from ${readingFrom.address}\r\n'.codeUnits);
+        unawaited(socket.close());
+      } else {
+        if (_stopped) {
+          socket.close();
+        } else {
+          readingFrom = socket;
+          _lastTime = null;
+          socket.listen((Uint8List data) async {
+            await receive(data);
+          }, onDone: () {
+            readingFrom = null;
+            firstLineMatched = false;
+          });
+        }
+      };
+    });
+  }
+
+  @override
+  Future<void> receiveLine(String line) async {
+    if (firstLineMatched) {
+      if (line == 'exit') {
+        readingFrom?.add("Goodbye.\n".codeUnits);
+        await(readingFrom?.flush());
+        unawaited(readingFrom.close());
+        return;
+      } else {
+        return super.receiveLine(line);
+      }
+    }
+    if (line == securityString) {
+      readingFrom?.add('Security string matched.\n'.codeUnits);
+      readingFrom?.add('"exit" will close socket.\n'.codeUnits);
+      await(readingFrom?.flush());
+      firstLineMatched = true;
+    } else {
+      readingFrom?.add('Bad security string.\n'.codeUnits);
+      await(readingFrom?.flush());
+      unawaited(readingFrom?.close());
     }
   }
 }
