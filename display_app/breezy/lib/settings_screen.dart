@@ -102,7 +102,8 @@ class _SettingsScreenState extends State<SettingsScreen>
         return true;
       },
       child: Scaffold(
-          appBar: AppBar(title: Text('Breezy Settings')),
+          appBar: AppBar(
+            title: Text('Breezy Settings')),
           body: SingleChildScrollView(
               padding: EdgeInsets.all(5),
               child: Column(

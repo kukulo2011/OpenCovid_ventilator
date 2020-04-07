@@ -3,8 +3,7 @@ import 'package:pedantic/pedantic.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:connectivity/connectivity.dart'
     show Connectivity, ConnectivityResult;
-import 'dart:io'
-    show exit, stdout, File, Directory, NetworkInterface;
+import 'dart:io' show exit, stdout, File, Directory, NetworkInterface;
 import 'dart:convert' as convert;
 import 'dart:math' show Random;
 import 'serial_test.dart';
@@ -143,6 +142,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
   Widget doBuild(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
+          leading: Image.asset('assets/breeze_icon_white_256x256.png'),
           title: Text(widget._title),
           actions: <Widget>[
             PopupMenuButton<void Function()>(
@@ -416,7 +416,7 @@ class Settings {
         result.writeln('        Baud rate:  $baudRate');
         result.writeln('        eight data bits, one stop bit, no parity');
         result.writeln(
-            '        meter incoming data by time (for debug):  $meterData');
+            '    meter incoming data by time (for debug):  $meterData');
         break;
       case InputSource.screenDebug:
         result.writeln('    Input from internal demo functions');
@@ -429,7 +429,7 @@ class Settings {
         result.writeln('    Connect to port:  $socketPort');
         result.writeln('    First line of input must be "$securityString"');
         result.writeln(
-          '        meter incoming data by time (for debug):  $meterData');
+            '        meter incoming data by time (for debug):  $meterData');
         result.writeln(
             '    ${localAddresses.length} available network interface(s):');
         for (final s in localAddresses) {
