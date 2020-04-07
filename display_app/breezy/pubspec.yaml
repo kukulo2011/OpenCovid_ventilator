@@ -1,7 +1,7 @@
 name: breezy
 description: Breezy - Emergency Ventilator Display
 
-version: 0.0.9
+version: 0.0.10
 
 environment:
   sdk: ">=2.1.0 <3.0.0"
@@ -15,9 +15,8 @@ dependencies:
   screen: ^0.0.5
   intl: ^0.16.1
   path_provider: ^1.6.5
-  flutter_blue: 0.7.1
-    # https://pub.dev/packages/flutter_blue says "Please be
-    # fully prepared to deal with breaking changes."
+    # https://pub.dev/packages/flutter_blue is a good candidate if we want
+    # to add bluetooth support
 
 dev_dependencies:
   flutter_test:

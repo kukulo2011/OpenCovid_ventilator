@@ -69,3 +69,24 @@ That might work - it makes 3 big .apk files:
 ✓ Built build/app/outputs/apk/release/app-armeabi-v7a-release.apk (5.5MB).
 ✓ Built build/app/outputs/apk/release/app-arm64-v8a-release.apk (5.8MB).
 ✓ Built build/app/outputs/apk/release/app-x86_64-release.apk (5.9MB).
+
+
+
+6 April 2020
+============
+
+Bluetooth setup...
+   Various tools are broken in linux; a workaround is here:
+       https://bbs.archlinux.org/viewtopic.php?id=201672
+   Then, try this setup:
+       https://unix.stackexchange.com/questions/92255/how-do-i-connect-and-send-data-to-a-bluetooth-serial-port-on-linux
+           (For the SP service I used channel 7, which was available)
+
+That made the "Serial Bluetooth" app on my phone work.  It listed the
+paired devices.
+
+Oh - this is "bluetooth classic."  The Flutter library only supports
+the newer "bluetooth LE."  Setting up a bluetooth LE service on Linux
+is complicated.
+
+
