@@ -1,7 +1,7 @@
 name: breezy
 description: Breezy - Emergency Ventilator Display
 
-version: 0.1.0
+version: 0.1.0+2        # After '+' is the version code, for the app store
 
 environment:
   sdk: ">=2.1.0 <3.0.0"
@@ -27,7 +27,7 @@ dev_dependencies:
 flutter_icons:
     android: 'launcher_icon'
     ios: true
-    image_path: assets/breeze_icon_512x512.png
+    image_path: assets/breeze_icon_with_background_512x512.png
     # If changed, "flutter pub run flutter_launcher_icons:main"
     # See https://pub.dev/packages/flutter_launcher_icons
 

@@ -29,6 +29,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
+// TODO:  Receive .breezy config files
+//    cf. https://pub.dev/packages/receive_sharing_intent,
+//        https://stackoverflow.com/questions/4799576/register-a-new-file-type-in-android#4838863
+
 class DataFeed {
   final List<ChartedValue> chartedValues;
   final List<FormattedValue> displayedValues;
