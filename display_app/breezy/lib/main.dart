@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:path_provider/path_provider.dart';
@@ -39,6 +41,7 @@ SOFTWARE.
 void main() async {
   runApp(MyApp());
 }
+
 
 class Log {
   // TODO:  Send this to an internal buffer, so we can access it from a menu
@@ -132,6 +135,9 @@ class _BreezyHomePageState extends State<BreezyHomePage>
 
   @override
   Widget build(BuildContext context) {
+    for (int i = 0; i < 10000; i++) {
+      Float64List(10000);
+    }
     return FutureBuilder<void>(
         future: asyncInit(),
         builder: (context, snapshot) {
@@ -160,8 +166,8 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                                 context,
                                 MaterialPageRoute(
                                     builder: (context) => GraphsScreen(
-                                        // dataSource: DeviceDataSource.screenDebug()
-                                        dataSource: src)));
+                                        dataSource: src,
+                                        feed: globals.configuration.feed)));
                           }
                         },
                         child: Row(
@@ -240,7 +246,8 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                                 MaterialPageRoute(
                                     builder: (context) => GraphsScreen(
                                         // dataSource: DeviceDataSource.screenDebug()
-                                        dataSource: src))));
+                                        dataSource: src,
+                                        feed: globals.configuration.feed))));
                           }
                         }),
                     Spacer(),

@@ -29,6 +29,12 @@ abstract class TimedData {
   double get timeMS;
 }
 
+abstract class WindowedData<T> {
+  void append(T e);
+  double get windowSize;
+  List<T> get window;
+}
+
 /// An efficient implementation of a Deque for "rolling" data.  Customers must
 /// append data to this dequeue in ascending order.  As data is appended, old
 /// data is purged from the beginning.  Bookkeeping is done to efficiently
@@ -41,8 +47,9 @@ abstract class TimedData {
 ///
 /// This class uses assertions to validate that out-of-order elements are
 /// not added.
-class RollingDeque<T extends TimedData> {
+class RollingDeque<T extends TimedData> implements WindowedData<T> {
   final List<T> _list;
+  @override
   final double windowSize; // In the same units as RollingDequeData.time
   final double _gapSize;
   final T Function(double time) _dummyFactory;
@@ -58,6 +65,7 @@ class RollingDeque<T extends TimedData> {
   }
 
   /// Append e to the list, while enforcing the window size and gap.
+  @override
   void append(T e) {
     _window = null; // Invalidate cached value
     assert(length == 1 || this[length - 2].timeMS < e.timeMS);
@@ -98,6 +106,7 @@ class RollingDeque<T extends TimedData> {
 
   /// Give a view of the data within the window needed by a rolling display.
   /// In other words, give a view sorted by time.remainder(windowSize).
+  @override
   List<T> get window {
     _window ??= _RollingDequeWindowIterable(this, _minElementIndex)
         .toList(growable: false);
@@ -147,8 +156,9 @@ class _RollingDequeWindowIterator<T extends TimedData> implements Iterator<T> {
 ///
 /// This class uses assertions to validate that out-of-order elements are
 /// not added.
-class SlidingDeque<T extends TimedData> {
+class SlidingDeque<T extends TimedData> implements WindowedData<T> {
   final List<T> _list;
+  @override
   final double windowSize;
   int length = 0;
   int _firstIndex = 0;
@@ -158,6 +168,7 @@ class SlidingDeque<T extends TimedData> {
       : this._list = List<T>(maxElements);
 
   /// Append e to the list, while enforcing the window size and gap.
+  @override
   void append(T e) {
     _window = null; // Invalidate cached value
     assert(length == 0 || this[length - 1].timeMS < e.timeMS);
@@ -182,6 +193,7 @@ class SlidingDeque<T extends TimedData> {
   }
 
   /// Give a view of the data within the window needed by a sliding display.
+  @override
   List<T> get window {
     _window ??= _SlidingDequeWindowIterable(this)
         .toList(growable: false);

@@ -37,7 +37,7 @@ SOFTWARE.
 
 // Code to read device data goes here
 
-/// Data from the device
+/// One data sample from the device
 class DeviceData {
   final List<String> displayedValues;
   final ChartData chart;
@@ -170,7 +170,9 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
           displayed[i] = parts[pos++];
         }
         int checksum = int.parse(parts[pos++]);
-        if (checksum != -1) {
+        if (checksum == -1 && feedSpec.checksumIsOptional) {
+          // That's OK
+        } else {
           final crc = Crc16();
           final lastComma = line.lastIndexOf(",");
           for (int i = 0; i <= lastComma; i++) {

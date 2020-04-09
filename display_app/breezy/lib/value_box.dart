@@ -256,10 +256,7 @@ class _ValueBoxPainter extends CustomPainter {
                   size.width / state.valueTotalWidth,
                   size.height /
                       (state.valueHeight * (1 + widget.unitsFontSizeFraction)));
-          unitsFontSize = fontSize *
-              widget.unitsFontSizeFraction *
-              state.valueHeight /
-              state.unitsHeight;
+          unitsFontSize = fontSize * widget.unitsFontSizeFraction;
           if (state.unitsWidth * unitsFontSize / widget.unitsFontSize >
               size.width) {
             unitsFontSize =
