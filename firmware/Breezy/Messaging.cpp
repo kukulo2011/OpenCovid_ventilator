@@ -10,13 +10,17 @@ Messaging messaging;
 uint8_t Messaging::poll(void)
 {
   static uint32_t last_poll = 0;
+
+  
   uint32_t mil = millis();
   
   if(mil - last_poll < (uint32_t)MESSAGE_PERIOD_MS){ // it is not the time yet
     return 0;
   }
   
-  last_poll -= (uint32_t)STATISTICS_PERIOD_MS;
+  last_poll += (uint32_t)MESSAGE_PERIOD_MS;
+
+  
   
   print_msg();
   print_service_msg();
@@ -84,7 +88,12 @@ uint8_t Messaging::print_msg(void)
   uint16_t crc = Crc16.get_crc16(msg);
 
   sprintf(&msg[strlen(msg)], "%5u\r\n", crc);
-  Serial.print(msg);
+  if ( xSemaphoreTake( xSerialSemaphore, ( TickType_t ) 5 ) == pdTRUE )
+  {
+    Serial.print(msg);
+    xSemaphoreGive( xSerialSemaphore ); // Now free or "Give" the Serial Port for others.
+  }
+  
   return 0;
 }
 
@@ -103,6 +112,10 @@ uint8_t Messaging::print_service_msg(void)
   uint16_t crc = Crc16.get_crc16(msg);
 
   sprintf(&msg[strlen(msg)], "%5u\r\n", crc);  
-  Serial.print(msg);
+  if ( xSemaphoreTake( xSerialSemaphore, ( TickType_t ) 5 ) == pdTRUE )
+  {
+    Serial.print(msg);
+    xSemaphoreGive( xSerialSemaphore ); // Now free or "Give" the Serial Port for others.
+  }
   return 0;
 }

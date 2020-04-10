@@ -1,3 +1,6 @@
+#include <Arduino_FreeRTOS.h>
+#include <semphr.h>  // add the FreeRTOS functions for Semaphores (or Flags).
+extern SemaphoreHandle_t xSerialSemaphore;
 
 // Message time granularity
 #define MESSAGE_PERIOD_MS (50)

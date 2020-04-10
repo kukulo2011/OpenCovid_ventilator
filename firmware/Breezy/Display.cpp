@@ -118,7 +118,7 @@ uint8_t Display::poll(void)
     return 0;
   }
   
-  last_poll -= (uint32_t)DISPLAY_PERIOD_MS;
+  last_poll += (uint32_t)DISPLAY_PERIOD_MS;
 
   display.hello();
   
