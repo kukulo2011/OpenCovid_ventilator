@@ -86,7 +86,7 @@ class ValueBox extends StatelessWidget {
                       postfix: postfix,
                       units: units,
                       unitsHeightFraction:
-                          0.75 * labelHeightFactor / (1 - labelHeightFactor),
+                          0.85 * labelHeightFactor / (1 - labelHeightFactor),
                       format: format,
                       color: color),
                 )
