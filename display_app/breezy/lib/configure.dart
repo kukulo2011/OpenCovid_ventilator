@@ -72,7 +72,7 @@ class DataFeed {
     FormattedValue('#0.0', 0, 99.9),
     FormattedValue('##0', 0, 100.0),
     FormattedValue('#0.0', 0, 99.9),
-    FormattedValue('0.0', 0, 9.9),
+    RatioValue('0.0', 0.5, 2),
     FormattedValue('#0.0', 0, 99.9),
     FormattedValue('#0.0', 0, 99.9),
     FormattedValue('###0', 0, 9999),
@@ -87,6 +87,21 @@ class FormattedValue {
 
   FormattedValue(String format, this.minValue, this.maxValue)
       : this.format = NumberFormat(format);
+
+  String formatValue(double value) => format.format(value);
+}
+
+class RatioValue extends FormattedValue {
+  RatioValue(String format, double minValue, double maxValue)
+      : super(format, minValue, maxValue);
+  String formatValue(double value) {
+    if (value >= 1.0) {
+      return format.format(value) + ':1';
+    } else {
+      return '1:' + format.format(1/value);
+    }
+  }
+
 }
 
 class ChartedValue {
@@ -281,14 +296,14 @@ class RollingChart extends ScreenValue
   /// flex.  This is helpful for having different portrait/landscape
   /// layouts.
   RollingChart withFlex(int newFlex) => RollingChart(
-    flex: newFlex,
-    minValue: minValue,
-    maxValue: maxValue,
-    displayedTimeTicks: displayedTimeTicks,
-    color: color,
-    label: label,
-    dequeIndex: dequeIndex,
-    valueIndex: valueIndex);
+      flex: newFlex,
+      minValue: minValue,
+      maxValue: maxValue,
+      displayedTimeTicks: displayedTimeTicks,
+      color: color,
+      label: label,
+      dequeIndex: dequeIndex,
+      valueIndex: valueIndex);
 
   @override
   material.Widget build(HistoricalData data) {
@@ -380,9 +395,8 @@ Screen _defaultScreen() {
         valueIndex: 6,
         label: 'I:E',
         units: null,
-        format: '#.#',
-        color: material.Colors.lightGreen,
-        prefix: '1:'),
+        format: '1:#,#', // ',' instead of '.' so it doesn't align
+        color: material.Colors.lightGreen),
     ValueBox(
         valueIndex: 7,
         label: 'MVi',
@@ -442,18 +456,15 @@ Screen _defaultScreen() {
       ScreenRow(flex: 2, content: [
         displayedValues[0],
         ScreenColumn(content: [displayedValues[1], displayedValues[2]]),
-        ScreenColumn(
-        content: [displayedValues[7], displayedValues[8]]),
-
+        ScreenColumn(content: [displayedValues[7], displayedValues[8]]),
       ]),
       ScreenRow(flex: 2, content: [
-        ScreenColumn(
-          content: [displayedValues[3], displayedValues[4]]),
+        ScreenColumn(content: [displayedValues[3], displayedValues[4]]),
         ScreenColumn(content: [displayedValues[5], displayedValues[6]]),
-        ScreenColumn(
-          content: [displayedValues[9], displayedValues[10]])
+        ScreenColumn(content: [displayedValues[9], displayedValues[10]])
       ]),
-    ])]);
+    ])
+  ]);
 
   return Screen(name: 'default', portrait: portrait, landscape: landscape);
 }

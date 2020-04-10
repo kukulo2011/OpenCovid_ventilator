@@ -481,7 +481,7 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
               (spec.maxValue - spec.minValue) * _random.nextDouble();
         }
       }
-      displayed[i] = spec.format.format(lastValue[i]);
+      displayed[i] = spec.formatValue(lastValue[i]);
     }
     _listener?.processDeviceData(DeviceData(_currTime, charted, displayed));
     _currTime += 0.020;
