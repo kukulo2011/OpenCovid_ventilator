@@ -31,7 +31,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-
 ///
 /// The screen where all the fancy graphs are shown.  This is the primary
 /// screen for this app.
@@ -109,7 +108,7 @@ class _GraphsScreenState extends State<GraphsScreen>
     super.initState();
     _dataSource.start(this);
     unawaited(Screen.keepOn(true));
-    screen.init();    // TODO:  Move where this belongs
+    screen.init(); // TODO:  Move where this belongs
   }
 
   @override
@@ -128,51 +127,48 @@ class _GraphsScreenState extends State<GraphsScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-        data: ThemeData.dark(),
-        child: Scaffold(
-            backgroundColor: Colors.black,
-            body: SafeArea(
-              child: Stack(children: <Widget>[
-                Container(
-                    decoration: const BoxDecoration(
+    return Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Stack(children: <Widget>[
+            Container(
+                decoration: const BoxDecoration(
+                    border: Border(
+                        top:
+                            BorderSide(width: 2, color: Colors.transparent),
+                        left:
+                            BorderSide(width: 2, color: Colors.transparent),
+                        right:
+                            BorderSide(width: 2, color: Colors.transparent),
+                        bottom: BorderSide(
+                            width: 2, color: Colors.transparent))),
+                child: Container(
+                    decoration: BoxDecoration(
                         border: Border(
-                            top:
-                                BorderSide(width: 2, color: Colors.transparent),
-                            left:
-                                BorderSide(width: 2, color: Colors.transparent),
                             right:
-                                BorderSide(width: 2, color: Colors.transparent),
-                            bottom: BorderSide(
-                                width: 2, color: Colors.transparent))),
-                    child: Container(
-                        decoration: BoxDecoration(
-                            border: Border(
-                                right:
-                                    BorderSide(width: 1, color: _borderColor),
-                                bottom:
-                                    BorderSide(width: 1, color: _borderColor))),
-                        child: buildMainContents())),
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: IconButton(
-                      icon: Icon(Icons.arrow_back),
-                      iconSize: 14,
-                      padding: EdgeInsets.all(0),
-                      tooltip: 'Back',
-                      onPressed: () => Navigator.of(context).pop()),
-                )
-              ]),
-            )));
+                                BorderSide(width: 1, color: _borderColor),
+                            bottom:
+                                BorderSide(width: 1, color: _borderColor))),
+                    child: buildMainContents())),
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: IconButton(
+                  icon: Icon(Icons.arrow_back),
+                  iconSize: 14,
+                  padding: EdgeInsets.all(0),
+                  tooltip: 'Back',
+                  onPressed: () => Navigator.of(context).pop()),
+            )
+          ]),
+        ));
   }
 
   Widget buildMainContents() {
     return OrientationBuilder(
-      builder: (BuildContext context, Orientation orientation) =>
-      orientation == Orientation.portrait
-        ? screen.portrait.build(_data)
-        : screen.landscape.build(_data)
-    );
+        builder: (BuildContext context, Orientation orientation) =>
+            orientation == Orientation.portrait
+                ? screen.portrait.build(_data)
+                : screen.landscape.build(_data));
   }
 }

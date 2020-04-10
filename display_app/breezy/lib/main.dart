@@ -135,9 +135,6 @@ class _BreezyHomePageState extends State<BreezyHomePage>
 
   @override
   Widget build(BuildContext context) {
-    for (int i = 0; i < 10000; i++) {
-      Float64List(10000);
-    }
     return FutureBuilder<void>(
         future: asyncInit(),
         builder: (context, snapshot) {
@@ -233,7 +230,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                     Spacer(),
                     RaisedButton(
                         child: Row(children: <Widget>[
-                          Text('Show Graph Screeen'),
+                          Text('Show Graph Screen'),
                           const SizedBox(width: 20),
                           Icon(Icons.timeline, color: Colors.black)
                         ]),

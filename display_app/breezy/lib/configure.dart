@@ -98,10 +98,9 @@ class RatioValue extends FormattedValue {
     if (value >= 1.0) {
       return format.format(value) + ':1';
     } else {
-      return '1:' + format.format(1/value);
+      return '1:' + format.format(1 / value);
     }
   }
-
 }
 
 class ChartedValue {
@@ -228,6 +227,7 @@ class ScreenRow extends ScreenContainer {
 class ValueBox extends ScreenValue {
   final int valueIndex;
   final String label;
+  final double labelHeightFactor;
   final String units;
   final String format;
   final Color color;
@@ -237,6 +237,7 @@ class ValueBox extends ScreenValue {
       {int flex = 1,
       @required this.valueIndex,
       @required this.label,
+      @required this.labelHeightFactor,
       @required this.units,
       @required this.format,
       @required this.color,
@@ -249,6 +250,7 @@ class ValueBox extends ScreenValue {
     final vb = ui.ValueBox(
         value: data.current?.displayedValues?.elementAt(valueIndex),
         label: label,
+        labelHeightFactor: labelHeightFactor,
         format: format,
         color: color,
         units: units,
@@ -264,6 +266,7 @@ class ValueBox extends ScreenValue {
       flex: newFlex,
       valueIndex: valueIndex,
       label: label,
+      labelHeightFactor: labelHeightFactor,
       units: units,
       format: format,
       color: color,
@@ -278,6 +281,7 @@ class RollingChart extends ScreenValue
   final int displayedTimeTicks;
   final charts.Color color;
   final String label;
+  final double labelHeightFactor;
   final int dequeIndex;
   final int valueIndex;
 
@@ -288,6 +292,7 @@ class RollingChart extends ScreenValue
       @required this.displayedTimeTicks,
       @required this.color,
       @required this.label,
+      @required this.labelHeightFactor,
       @required this.dequeIndex,
       @required this.valueIndex})
       : super(flex);
@@ -302,6 +307,7 @@ class RollingChart extends ScreenValue
       displayedTimeTicks: displayedTimeTicks,
       color: color,
       label: label,
+      labelHeightFactor: labelHeightFactor,
       dequeIndex: dequeIndex,
       valueIndex: valueIndex);
 
@@ -310,6 +316,7 @@ class RollingChart extends ScreenValue
     final tc = ui.RollingChart<ChartData>(
         selector: this,
         label: label,
+        labelHeightFactor: labelHeightFactor,
         numTicks: displayedTimeTicks,
         minValue: minValue,
         maxValue: maxValue,
@@ -326,6 +333,7 @@ class RollingChart extends ScreenValue
 Screen _defaultScreen() {
 // By re-calculating this every time, we make development using
 // hot reload easier
+  final labelHeight = 0.24;
   final chartedValues = [
     RollingChart(
         dequeIndex: 0,
@@ -333,6 +341,7 @@ Screen _defaultScreen() {
         color: charts.MaterialPalette.deepOrange.shadeDefault.lighter,
         displayedTimeTicks: 11,
         label: 'PRESSURE cmH2O',
+        labelHeightFactor: labelHeight/2,
         minValue: -10.0,
         maxValue: 50.0),
     RollingChart(
@@ -341,6 +350,7 @@ Screen _defaultScreen() {
         color: charts.MaterialPalette.green.shadeDefault.lighter,
         displayedTimeTicks: 11,
         label: 'FLOW l/min',
+        labelHeightFactor: labelHeight/2,
         minValue: -100.0,
         maxValue: 100.0),
     RollingChart(
@@ -349,6 +359,7 @@ Screen _defaultScreen() {
         color: charts.MaterialPalette.blue.shadeDefault.lighter,
         displayedTimeTicks: 11,
         label: 'VOLUME ml',
+        labelHeightFactor: labelHeight/2,
         minValue: 0.0,
         maxValue: 800.0),
   ];
@@ -357,12 +368,14 @@ Screen _defaultScreen() {
     ValueBox(
         valueIndex: 0,
         label: 'Ppeak',
+        labelHeightFactor: labelHeight/2,
         units: 'cmH2O',
         format: '##.#',
         color: material.Colors.orange.shade300),
     ValueBox(
         valueIndex: 1,
         label: 'Pmean',
+        labelHeightFactor: labelHeight,
         units: 'cmH2O',
         format: '##.#',
         color: material.Colors.orange.shade300),
@@ -370,17 +383,20 @@ Screen _defaultScreen() {
         valueIndex: 2,
         label: 'PEEP',
         units: 'cmH2O',
+        labelHeightFactor: labelHeight,
         format: '##.#',
         color: material.Colors.orange.shade300),
     ValueBox(
         valueIndex: 3,
         label: 'RR',
+        labelHeightFactor: labelHeight,
         units: 'b/min',
         format: '##.#',
         color: material.Colors.lightGreen),
     ValueBox(
         valueIndex: 4,
         label: 'O2',
+        labelHeightFactor: labelHeight,
         units: null,
         format: '1##',
         color: material.Colors.lightGreen,
@@ -388,36 +404,42 @@ Screen _defaultScreen() {
     ValueBox(
         valueIndex: 5,
         label: 'Ti',
+        labelHeightFactor: labelHeight,
         units: 's',
         format: '##.##',
         color: material.Colors.lightGreen),
     ValueBox(
         valueIndex: 6,
         label: 'I:E',
+        labelHeightFactor: labelHeight,
         units: null,
         format: '1:#,#', // ',' instead of '.' so it doesn't align
         color: material.Colors.lightGreen),
     ValueBox(
         valueIndex: 7,
         label: 'MVi',
+        labelHeightFactor: labelHeight,
         units: 'l/min',
         format: '##.#',
         color: material.Colors.lightBlue),
     ValueBox(
         valueIndex: 8,
         label: 'MVe',
+        labelHeightFactor: labelHeight,
         units: 'l/min',
         format: '##.#',
         color: material.Colors.lightBlue),
     ValueBox(
         valueIndex: 9,
         label: 'VTi',
+        labelHeightFactor: labelHeight,
         units: null,
         format: '####',
         color: material.Colors.lightBlue),
     ValueBox(
         valueIndex: 10,
         label: 'VTe',
+        labelHeightFactor: labelHeight,
         units: 'ml',
         format: '####',
         color: material.Colors.lightBlue)
