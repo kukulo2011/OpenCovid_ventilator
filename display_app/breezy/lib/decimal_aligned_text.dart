@@ -161,7 +161,7 @@ class _ValueBoxPainter extends CustomPainter {
               heightForUnits / state.unitsHeight);
       final double uh = state.unitsHeight * unitsFontSize / 100;
       final double available = size.height - (uh + vh);
-      final space = min(available, uh/4);
+      final space = min(available, uh/2);
       // For the whitespace below the value, take no more than the height
       // of units.
       final double w = state.unitsWidth * unitsFontSize / 100;
