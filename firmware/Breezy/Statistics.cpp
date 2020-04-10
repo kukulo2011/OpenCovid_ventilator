@@ -36,12 +36,14 @@ uint8_t Statistics::poll(void)
   static uint8_t last_is_insp = 0;
   uint8_t is_insp = 0;
   uint32_t mil = millis();
+
   
   if(mil - last_poll < (uint32_t)STATISTICS_PERIOD_MS){ // it is not the time yet
     return 0;
   }
   
-  last_poll -= (uint32_t)STATISTICS_PERIOD_MS;
+  last_poll += (uint32_t)STATISTICS_PERIOD_MS;
+
   
   sensors.measure();
   
