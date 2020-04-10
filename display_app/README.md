@@ -32,56 +32,23 @@ If there are problems, `flutter doctor` might be helpful.  If everything works, 
 look like this:
 ![Running from Command Line](misc/flutter_run.png)
 
-### Installation of a Debug Build - if bundletool works
-
-This application uses Flutter, which has a significant native (non-Java)
-component.  Instead of an APK, applications are distributed as an "aab" file.
-A tool called "bundletool" is used to generate apks, and then used again
-to select the correct apk for a connected device.  So to install a debug
-build, the first step is to go over to https://github.com/google/bundletool/,
-and get the latest release of the bundletool jar.  As of this writing, that's
-`bundletool-all-0.13.3.jar`.  Then, make up a little shell script or whatever to run
-it.  Personally, I put the jar in `~/lib`, and I made a shell script like this in my
-`~/bin`:
-```bash
-#!/bin/bash
-JAR=$HOME/lib/bundletool-all-0.13.3.jar
-echo "Running $JAR"
-echo "cf. https://github.com/google/bundletool/"
-java -jar $JAR "$@"
-```
-On my side, I'll build `app-release.abb` with the command `flutter build appbundle`, and I'll
-generate the (huge) `.apks` file, which I'll call `breezy.apks`.  (Note to self:  that's done with
-`bundletool build-apks --bundle=app-release.aab --output=breezy.apks`).  I have to do this step, because
-it signs the underlying apk files with a debug key.  To install the app, download `breezy.apks`,
-and do this:
-```ignorelang
-bundletool install-apks --apks=~/tmp/tmp/breezy.apks
-```
-If there are  multiple devices connected, it will tell you to use `--device-id`.  
-
-### Installation of a debug build - if bundletool does not work
-
-A more manual way of doing this that was found to work is as follows.  The `.apks` file reference
-above is really just a zip file that contains a bunch of APK files.  So what has been found to
-work is:
-```ignorelang
-billf@Zathras:~/tmp/tmp$ unzip breezy.apks
-<... lots of output ...>
-billf@Zathras:~/tmp/tmp$ mv standalones/standalone-armeabi_v7a_hdpi.apk breezy.apk
-billf@Zathras:~/tmp/tmp$ adb install breezy.apk
-```
-The `.apk` files in the `.apks` archive are already signed.  Depending on hardware, a different
-standalone apk might be appropriate.
-
-### TODO - the better way to distribute and install
+### Commands used to build/deploy
 ```
 flutter clean
 flutter build appbundle
 ```
-Then deploy to play store via internal app sharing.  Or:
+This makes a build for the Play Store.  Alternately,
 ```
 flutter clean
 flutter build apk --split-per-abi
 ```
-and upload to github.
+makes APKs suitable for github
+
+## Testing with a socket
+
+The application is designed to connect to an embedded system using
+a serial connection over USB.  In the future, it will be extended
+for Bluetooth connections.  It also allows a data source to connect
+a socket to the display device, which may be useful for debugging.
+See [`misc/send_data_to_display.sh`](misc/send_data_to_display.sh) for a Linux script to
+send a log file to the display device.

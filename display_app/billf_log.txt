@@ -89,4 +89,7 @@ Oh - this is "bluetooth classic."  The Flutter library only supports
 the newer "bluetooth LE."  Setting up a bluetooth LE service on Linux
 is complicated.
 
+7 Apr.
 
+Ah - it seems that iOS only supports BLE.  There is a dart library
+for Bluetooth classic - see issue.

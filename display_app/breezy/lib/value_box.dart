@@ -133,6 +133,7 @@ class DecimalAlignedText extends StatefulWidget {
 
 class _DecimalAlignedTextState extends State<DecimalAlignedText> {
   NumberFormat numberFormat;
+  bool noDecimal;
   int decimalIndex; // If no decimal, length of format string
   double valueBeforeWidth; // Width of the part of the value before '.'
   double valueAfterWidth; // Including decimal point
@@ -148,7 +149,8 @@ class _DecimalAlignedTextState extends State<DecimalAlignedText> {
     super.initState();
     decimalIndex = widget.format.indexOf('.');
     RenderParagraph p;
-    if (decimalIndex == -1) {
+    noDecimal = decimalIndex == -1;
+    if (noDecimal) {
       decimalIndex = widget.format.length;
       valueAfterWidth = 0;
       valueHeight = 0;
@@ -256,10 +258,7 @@ class _ValueBoxPainter extends CustomPainter {
                   size.width / state.valueTotalWidth,
                   size.height /
                       (state.valueHeight * (1 + widget.unitsFontSizeFraction)));
-          unitsFontSize = fontSize *
-              widget.unitsFontSizeFraction *
-              state.valueHeight /
-              state.unitsHeight;
+          unitsFontSize = fontSize * widget.unitsFontSizeFraction;
           if (state.unitsWidth * unitsFontSize / widget.unitsFontSize >
               size.width) {
             unitsFontSize =
@@ -327,7 +326,7 @@ class _ValueBoxPainter extends CustomPainter {
     if (value == null) {
       x += beforeW + afterW;
     } else {
-      int decimalIndex = value.indexOf('.');
+      int decimalIndex = state.noDecimal ? -1 : value.indexOf('.');
       if (decimalIndex == -1) {
         decimalIndex = value.length;
       }

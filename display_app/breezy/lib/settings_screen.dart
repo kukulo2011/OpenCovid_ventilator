@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'main.dart' show Settings, SettingsListener, InputSource;
+import 'main.dart' show Settings, SettingsListener, InputSource, UUID;
 import 'package:usb_serial/usb_serial.dart' show UsbSerial, UsbDevice;
 
 /*
@@ -44,6 +44,8 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen>
     implements SettingsListener {
   final Settings settings;
+  TextEditingController _socketPortController;
+  TextEditingController _securityStringController;
 
   _SettingsScreenState(this.settings);
 
@@ -51,24 +53,57 @@ class _SettingsScreenState extends State<SettingsScreen>
   void initState() {
     super.initState();
     settings.listeners.add(this);
+    _socketPortController = TextEditingController();
+    _socketPortController.text = settings.socketPort.toString();
+    _socketPortController.addListener(() {
+      try {
+        int port = int.parse(_socketPortController.text);
+        settings.socketPort = port;
+      } catch (ex) {
+        _socketPortController.text = settings.socketPort.toString();
+      }
+    });
+    _securityStringController = TextEditingController();
+    _securityStringController.value = _securityStringController.value.copyWith(
+        text: settings.securityString,
+        selection: TextSelection(
+            baseOffset: 0, extentOffset: settings.securityString.length));
+    _securityStringController.addListener(() {
+      String s = _securityStringController.text.trim();
+      if (s != '') {
+        settings.securityString = s;
+      } else {
+        settings.securityString = UUID.random().toString();
+        _securityStringController.value = _securityStringController.value
+            .copyWith(
+                text: settings.securityString,
+                selection: TextSelection(
+                    baseOffset: 0,
+                    extentOffset: settings.securityString.length));
+      }
+    });
   }
 
   @override
   void dispose() {
     super.dispose();
     settings.listeners.remove(this);
+    _socketPortController.dispose();
+    _securityStringController.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final isSerial = settings.inputSource == InputSource.serial;
+    final isSocket = settings.inputSource == InputSource.serverSocket;
     return WillPopScope(
       onWillPop: () async {
         await settings.write();
         return true;
       },
       child: Scaffold(
-          appBar: AppBar(title: Text('Breezy Settings')),
+          appBar: AppBar(
+            title: Text('Breezy Settings')),
           body: SingleChildScrollView(
               padding: EdgeInsets.all(5),
               child: Column(
@@ -79,6 +114,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                     RadioListTile<InputSource>(
                         title: const Text('USB Serial Port'),
                         value: InputSource.serial,
+                        groupValue: settings.inputSource,
+                        onChanged: (v) => settings.inputSource = v),
+                    RadioListTile<InputSource>(
+                        title: const Text('Socket Connection to This Device'),
+                        value: InputSource.serverSocket,
                         groupValue: settings.inputSource,
                         onChanged: (v) => settings.inputSource = v),
                     RadioListTile<InputSource>(
@@ -93,8 +133,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                         onChanged: (v) => settings.inputSource = v),
                     PopupMenuButton<int>(
                         child: ListTile(
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 16.0),
                           title: Text(
-                              'Port number ${settings.serialPortNumber}',
+                              'Serial Port number ${settings.serialPortNumber}',
                               style: Theme.of(context).textTheme.title.merge(
                                   isSerial
                                       ? null
@@ -105,6 +147,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                         itemBuilder: _buildSerialPortMenu),
                     PopupMenuButton<int>(
                         child: ListTile(
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 16.0),
                           title: Text('Baud rate ${settings.baudRate}',
                               style: Theme.of(context).textTheme.title.merge(
                                   isSerial
@@ -121,17 +165,52 @@ class _SettingsScreenState extends State<SettingsScreen>
                               PopupMenuItem(
                                   value: 115200, child: Text('115200')),
                             ]),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Row(children: [
+                        Text('Server Socket Port number:',
+                            style: Theme.of(context).textTheme.title.merge(
+                                isSocket
+                                    ? null
+                                    : const TextStyle(color: Colors.grey))),
+                        SizedBox(width: 16),
+                        Expanded(
+                            child: TextField(
+                                keyboardType: TextInputType.number,
+                                enabled: isSocket,
+                                autocorrect: false,
+                                controller: _socketPortController)),
+                      ]),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Row(children: [
+                        Text('Security string:',
+                            style: Theme.of(context).textTheme.title.merge(
+                                isSocket
+                                    ? null
+                                    : const TextStyle(color: Colors.grey))),
+                        SizedBox(width: 16),
+                        Expanded(
+                            child: TextField(
+                                enabled: isSocket,
+                                autocorrect: false,
+                                controller: _securityStringController)),
+                      ]),
+                    ),
                     PopupMenuButton<bool>(
                         child: ListTile(
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 16.0),
                           title: Text(
                               'Meter incoming data by timestamp: ${settings.meterData}',
                               style: Theme.of(context).textTheme.title.merge(
-                                  isSerial
+                                  isSerial || isSocket
                                       ? null
                                       : const TextStyle(color: Colors.grey))),
                         ),
                         onSelected: (v) => settings.meterData = v,
-                        enabled: isSerial,
+                        enabled: isSerial || isSocket,
                         itemBuilder: (context) => const [
                               PopupMenuItem(value: true, child: Text('true')),
                               PopupMenuItem(value: false, child: Text('false'))
