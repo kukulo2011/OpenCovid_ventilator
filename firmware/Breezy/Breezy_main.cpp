@@ -3,6 +3,7 @@
 #include "I2C.h"
 #include "Statistics.h"
 #include "Messaging.h" 
+#include "Display.h"
 
 
 void setup() {
@@ -12,16 +13,16 @@ void setup() {
   Serial.println("MCU_RESET");
 
   statistics.init();
+
+  display.init();
 }
 
 void loop() {
 
   statistics.poll();
   messaging.poll();
+  display.poll();
   
-  
-  messaging.print_msg();
-  messaging.print_service_msg();
   
   delay(50);
 }

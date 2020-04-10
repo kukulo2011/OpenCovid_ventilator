@@ -5,6 +5,9 @@
 // Statistics time granularity
 #define STATISTICS_PERIOD_MS (50)
 
+// Display time granularity
+#define DISPLAY_PERIOD_MS (700)
+
 // Flow higher than this will switch to the inspiration state
 // lower than negative will swith to the expiration state
 // unit: lpm
@@ -31,3 +34,8 @@
 #define P_O2_MAXVOLT (4.7)
 #define P_O2_MINOUTP (10)
 #define P_O2_MAXOUTP (700) // kPa
+
+// LCD wiring (According to RAMPS and Reprap discount smart controller)
+#define LCD_EN_PIN 23
+#define LCD_RW_PIN 17
+#define LCD_DI_PIN 16

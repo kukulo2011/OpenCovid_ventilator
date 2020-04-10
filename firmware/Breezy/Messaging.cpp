@@ -59,8 +59,14 @@ uint8_t Messaging::print_msg(void)
   
   dtostrf(statistics.ti, 5, 2, &msg[strlen(msg)]);
   strcat(msg, ",");
-  
-  dtostrf(statistics.i_e, 4, 1, &msg[strlen(msg)]);
+
+  if(statistics.i_e > 1){
+    dtostrf(statistics.i_e, 0, 1, &msg[strlen(msg)]);
+    sprintf(&msg[strlen(msg)], ":1" );
+  }else{
+    sprintf(&msg[strlen(msg)], "1:" );
+    dtostrf(1.0 / statistics.i_e, 0, 1, &msg[strlen(msg)]);
+  }
   strcat(msg, ",");
 
   dtostrf(statistics.mvi, 4, 1, &msg[strlen(msg)]);
