@@ -154,12 +154,21 @@ class _GraphsScreenState extends State<GraphsScreen>
               width: 20,
               height: 20,
               child: IconButton(
-                  icon: Icon(Icons.arrow_back),
+                  icon: Icon(Icons.arrow_back, color: Colors.white),
                   iconSize: 14,
-                  padding: EdgeInsets.all(0),
-                  tooltip: 'Back',
-                  onPressed: () => Navigator.of(context).pop()),
-            )
+                  padding: const EdgeInsets.all(0),
+                  tooltip: 'Back'),
+                // , onPressed: () => Navigator.of(context).pop()),
+            ),
+            SizedBox(
+              width: 50,
+              height: 50,
+              child: FlatButton(
+                color: Colors.transparent,
+                padding: const EdgeInsets.all(0),
+                onPressed: () => Navigator.of(context).pop()),
+              ),
+            // We show a tiny arrow, but make the touch area bigger.
           ]),
         ));
   }
