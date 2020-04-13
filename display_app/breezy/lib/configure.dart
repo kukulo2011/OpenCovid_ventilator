@@ -4,7 +4,7 @@ import 'dart:ui' show Color;
 import 'package:intl/intl.dart' show NumberFormat;
 import 'value_box.dart' as ui;
 import 'rolling_chart.dart' as ui;
-import 'read_device.dart' show DeviceData, ChartData;
+import 'read_device.dart' show ChartData;
 import 'graphs_screen.dart' show HistoricalData;
 import 'package:charts_flutter/flutter.dart' as charts;
 

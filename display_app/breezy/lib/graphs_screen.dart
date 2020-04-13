@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:charts_flutter/flutter.dart' as charts;
 import 'package:screen/screen.dart' show Screen;
 import 'package:pedantic/pedantic.dart';
-import 'rolling_chart.dart';
+import 'dart:async';
 import 'configure.dart' as config;
 import 'dequeues.dart';
 import 'read_device.dart';
+import 'main.dart' show Log;
 
 /*
 MIT License
@@ -97,6 +97,8 @@ class _GraphsScreenState extends State<GraphsScreen>
   final HistoricalData _data = HistoricalData();
   static final _borderColor = Colors.grey[700];
   final config.Screen screen = config.Screen.defaultScreens[0]; // TODO
+  Completer<void> _waitingForBuild;
+  DateTime _lastBuild = DateTime.now(); // never null
 
   _GraphsScreenState(this._dataSource, config.DataFeed feed) {
     int i = _data.getIndexFor(true, 10, 500);
@@ -116,17 +118,35 @@ class _GraphsScreenState extends State<GraphsScreen>
     super.dispose();
     _dataSource.stop();
     unawaited(Screen.keepOn(false));
+    _notifyBuild();
+  }
+
+  void _notifyBuild() {
+    if (_waitingForBuild != null) {
+      final w = _waitingForBuild;
+      _waitingForBuild = null;
+      w.complete(null);
+    }
+    _lastBuild = DateTime.now();
   }
 
   @override
-  void processDeviceData(DeviceData d) {
+  Future<void> processDeviceData(DeviceData d) async {
     setState(() {
       _data.receive(d);
     });
+    final delay = DateTime.now().difference(_lastBuild).inMilliseconds;
+    if (delay > 500 && _dataSource.running) {
+      final w = Completer<void>();
+      _waitingForBuild = w;
+      Log.writeln('Screen unbuilt for $delay ms:  Waiting for UI build.');
+      await w.future;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    _notifyBuild();
     return Scaffold(
         backgroundColor: Colors.black,
         body: SafeArea(
@@ -134,40 +154,35 @@ class _GraphsScreenState extends State<GraphsScreen>
             Container(
                 decoration: const BoxDecoration(
                     border: Border(
-                        top:
-                            BorderSide(width: 2, color: Colors.transparent),
-                        left:
-                            BorderSide(width: 2, color: Colors.transparent),
-                        right:
-                            BorderSide(width: 2, color: Colors.transparent),
-                        bottom: BorderSide(
-                            width: 2, color: Colors.transparent))),
+                        top: BorderSide(width: 2, color: Colors.transparent),
+                        left: BorderSide(width: 2, color: Colors.transparent),
+                        right: BorderSide(width: 2, color: Colors.transparent),
+                        bottom:
+                            BorderSide(width: 2, color: Colors.transparent))),
                 child: Container(
                     decoration: BoxDecoration(
                         border: Border(
-                            right:
-                                BorderSide(width: 1, color: _borderColor),
-                            bottom:
-                                BorderSide(width: 1, color: _borderColor))),
+                            right: BorderSide(width: 1, color: _borderColor),
+                            bottom: BorderSide(width: 1, color: _borderColor))),
                     child: buildMainContents())),
             SizedBox(
-              width: 20,
-              height: 20,
-              child: IconButton(
-                  icon: Icon(Icons.arrow_back, color: Colors.white),
-                  iconSize: 14,
-                  padding: const EdgeInsets.all(0),
-                  tooltip: 'Back'),
-                // , onPressed: () => Navigator.of(context).pop()),
-            ),
+                width: 20,
+                height: 20,
+                child: IconButton(
+                    icon: Icon(Icons.arrow_back, color: Colors.white),
+                    iconSize: 14,
+                    padding: const EdgeInsets.all(0),
+                    tooltip: 'Back',
+                    onPressed: () {})),
             SizedBox(
               width: 50,
               height: 50,
               child: FlatButton(
-                color: Colors.transparent,
-                padding: const EdgeInsets.all(0),
-                onPressed: () => Navigator.of(context).pop()),
-              ),
+                  color: Colors.transparent,
+                  child: Container(),
+                  padding: const EdgeInsets.all(0),
+                  onPressed: () => Navigator.of(context).pop()),
+            ),
             // We show a tiny arrow, but make the touch area bigger.
           ]),
         ));

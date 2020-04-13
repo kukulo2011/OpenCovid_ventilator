@@ -1,14 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show AssetBundle;
 import 'package:pedantic/pedantic.dart' show unawaited;
-import 'package:usb_serial/usb_serial.dart';
 
-import 'main.dart' show Log, Settings;
+import 'main.dart' show Log, Settings, BreezyGlobals;
 import 'dequeues.dart' show TimedData;
 import 'configure.dart' as config;
-import 'dart:io';
+import 'reader.dart';
+import 'dart:async';
 import 'dart:typed_data';
-import 'dart:async' show Timer;
 import 'dart:math';
 
 /*
@@ -62,7 +61,7 @@ class ChartData extends TimedData {
 }
 
 abstract class DeviceDataListener {
-  void processDeviceData(DeviceData d);
+  Future<void> processDeviceData(DeviceData d);
 }
 
 abstract class DeviceDataSource {
@@ -79,15 +78,20 @@ abstract class DeviceDataSource {
 
   /// A source that reads from a file that's baked into the asset bundle
   static DeviceDataSource fromAssetFile(
-          config.DataFeed feed, AssetBundle b, String name) =>
-      _AssetFileDataSource(feed, b, name);
+          Settings settings, config.DataFeed feed, AssetBundle b) =>
+      _AssetFileDataSource(settings, feed, b);
 
+  /// A source that takes serial data from the USB port
   static DeviceDataSource fromSerial(Settings settings, config.DataFeed feed) =>
       _SerialDataSource(settings, feed);
 
-  static DeviceDataSource serverSocket(
-          Settings settings, config.DataFeed feed) =>
-      _ServerSocketDataSource(settings, feed);
+  /// A source that opens a server socket, and accepts connections to send
+  /// us data.  Useful for debugging.
+  static DeviceDataSource serverSocket(BreezyGlobals globals) =>
+      _ServerSocketDataSource(globals.settings, globals.deviceAddresses,
+          globals.configuration.feed);
+
+  bool get running => _listener != null;
 
   @mustCallSuper
   void start(DeviceDataListener listener) {
@@ -101,40 +105,49 @@ abstract class DeviceDataSource {
   }
 }
 
-abstract class _ByteStreamDataSource extends DeviceDataSource {
-  static final int _cr = '\r'.codeUnitAt(0);
+abstract class _ByteStreamDataSource extends DeviceDataSource
+    implements ByteStreamListener {
+  final int _cr = '\r'.codeUnitAt(0);
   static final int _newline = '\n'.codeUnitAt(0);
   static final int _hash = '#'.codeUnitAt(0);
+  Settings settings;
+  ByteStreamReader reader;
   final bool _meterData;
   final _lineBuffer = StringBuffer();
-  int _lastTime; // Starts out null
+  int _lastTime; // Last time seen in file.  Starts out null
   int _currTime = 0; // 64 bits
-  bool _stopped = false;
   DateTime _startTime;
 
-  _ByteStreamDataSource(config.DataFeed feed, this._meterData) : super(feed);
+  _ByteStreamDataSource(this.settings, config.DataFeed feed, this._meterData)
+      : super(feed);
 
   @override
   start(DeviceDataListener listener) {
     super.start(listener);
-    _stopped = false;
-    unawaited(readUntilStopped());
+    reader = createReader(settings);
+    unawaited(reader.start());
   }
 
-  Future<void> readUntilStopped();
+  ByteStreamReader createReader(Settings settings);
+
+  @override
+  @mustCallSuper
+  void reset() {
+    _lastTime = null;
+  }
 
   @override
   void stop() {
     super.stop();
-    _stopped = true;
-    _startTime = null;
+    reader.stop();
   }
 
+  @override
   Future<void> receive(Uint8List data) async {
     for (int ch in data) {
       if (ch == _cr) {
         // skip
-      } else if (ch == _newline || _lineBuffer.length > 200) {
+      } else if (ch == _newline || _lineBuffer.length > 500) {
         await receiveLine(_lineBuffer.toString());
         _lineBuffer.clear();
       } else {
@@ -145,11 +158,10 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
 
   Future<void> receiveLine(String line) async {
     if (line.isEmpty || line.codeUnitAt(0) == _hash) {
-      // See the end of this method
       await Future.delayed(Duration(microseconds: 250), () => null);
+      // Just a bit of robustness if we get flooded by comments
       return;
     }
-    int unwaited = 0;
     List<String> parts = line.split(',');
     try {
       if (parts.length != 18) {
@@ -187,211 +199,100 @@ abstract class _ByteStreamDataSource extends DeviceDataSource {
         if (_meterData && _startTime == null) {
           _startTime = DateTime.now();
         }
-        if (_lastTime != null) {
+        if (_lastTime == null) {
+          _currTime += 100;
+        } else {
           int deltaT = (time - _lastTime) & 0xffff;
           if (deltaT <= 0) {
             throw Exception('bad deltaT:  $deltaT <= 0');
           }
           _currTime += deltaT;
-          unwaited++;
           if (_meterData) {
             int now = DateTime.now().difference(_startTime).inMilliseconds;
             int dNow = _currTime - now;
             if (dNow > 0) {
-              unwaited--;
               await Future.delayed(Duration(milliseconds: dNow), () => null);
             }
           }
         }
         _lastTime = time;
 
-        _listener?.processDeviceData(
-            DeviceData(_currTime / 1000.0, charted, displayed));
+        final l = _listener;
+        if (l != null) {
+          await l.processDeviceData(
+              DeviceData(_currTime / 1000.0, charted, displayed));
+        }
       }
     } catch (ex) {
       Log.writeln('$ex for "$line"');
-    }
-    // We put a slight delay in, so that if a device floods us with data,
-    // the application stands a chance of remaining responsive.  In normal
-    // operation, a line of about 100 characters comes every 20ms, so this
-    // slight delay will have no effect.
-    if (unwaited > 10) {
-      // If we're on a slow device, we want to catch up as much as possible
-      // before updating the screen.  Lacking anything like thread prioriries,
-      // this can't be done reliably, but we can at least try to process 10
-      // samples at a time if we're really behind.
-      unwaited = 0;
-      await Future.delayed(Duration(microseconds: 250), () => null);
     }
   }
 }
 
 class _AssetFileDataSource extends _ByteStreamDataSource {
-  final AssetBundle _bundle;
-  final String _name;
-  bool _stopped = false;
+  AssetBundle bundle;
 
-  _AssetFileDataSource(config.DataFeed feed, this._bundle, this._name)
-      : super(feed, true);
+  _AssetFileDataSource(Settings settings, config.DataFeed feed, this.bundle)
+      : super(settings, feed, true);
 
   @override
-  Future<void> readUntilStopped() async {
-    while (!_stopped) {
-      ByteData d = await _bundle.load(_name);
-      await receive(d.buffer.asUint8List(d.offsetInBytes, d.lengthInBytes));
-      // Just keep time marching forward, while looping through the data.
-      _lastTime = null;
-    }
+  ByteStreamReader createReader(Settings settings) {
+    return AssetFileReader(settings, bundle, this);
   }
 }
 
 class _SerialDataSource extends _ByteStreamDataSource {
-  final int baudRate;
-  final int portNumber;
-  UsbPort _port;
-
   _SerialDataSource(Settings settings, config.DataFeed feed)
-      : this.baudRate = settings.baudRate,
-        this.portNumber = settings.serialPortNumber,
-        super(feed, settings.meterData);
+      : super(settings, feed, settings.meterData);
 
   @override
-  void stop() {
-    super.stop();
-    if (_port != null) {
-      try {
-        _port.close();
-        _port = null;
-      } catch (ex) {
-        Log.writeln("Error closing serial port:  $ex");
-      }
-    }
-  }
-
-  @override
-  Future<void> readUntilStopped() async {
-    List<UsbDevice> devices = await UsbSerial.listDevices();
-    try {
-      if (_stopped) {
-        return;
-      }
-      _port = await devices[portNumber - 1].create();
-      if (_stopped) {
-        return;
-      }
-      if (!(await _port.open())) {
-        throw Exception("Failed to open device.");
-      }
-      if (_stopped) {
-        return;
-      }
-      await _port.setDTR(true);
-      if (_stopped) {
-        return;
-      }
-      await _port.setRTS(true);
-      if (_stopped) {
-        return;
-      }
-      await _port.setPortParameters(baudRate, UsbPort.DATABITS_8,
-          UsbPort.STOPBITS_1, UsbPort.PARITY_NONE);
-      if (_stopped) {
-        return;
-      }
-      _port.inputStream.listen((Uint8List event) async {
-        if (_stopped) {
-          return;
-        }
-        await receive(event);
-      });
-    } catch (ex) {
-      Log.writeln('Serial error: $ex');
-    }
+  ByteStreamReader createReader(Settings settings) {
+    return SerialReader(settings, this);
   }
 }
 
 class _ServerSocketDataSource extends _ByteStreamDataSource {
+  List<String> localAddresses;
   final int portNumber;
   final String securityString;
-  ServerSocket serverSocket;
-  Socket readingFrom;
   bool firstLineMatched = false;
+  ServerSocketReader socketReader;
 
-  _ServerSocketDataSource(Settings settings, config.DataFeed feed)
+  _ServerSocketDataSource(
+      Settings settings, this.localAddresses, config.DataFeed feed)
       : this.portNumber = settings.socketPort,
         this.securityString = settings.securityString,
-        super(feed, settings.meterData);
+        super(settings, feed, settings.meterData);
 
   @override
-  void stop() {
-    super.stop();
-    if (serverSocket != null) {
-      unawaited(serverSocket.close());
-      serverSocket = null;
-    }
-    if (readingFrom != null) {
-      unawaited(readingFrom.close());
-      readingFrom = null;
-    }
+  ByteStreamReader createReader(Settings settings) {
+    socketReader = ServerSocketReader(settings, this, localAddresses);
+    return socketReader;
   }
 
   @override
-  Future<void> readUntilStopped() async {
-    if (_stopped) {
-      return;
-    }
-    serverSocket = await ServerSocket.bind(InternetAddress.anyIPv4, portNumber);
-    // That allows IPv6 too.
-    // https://api.flutter.dev/flutter/dart-io/ServerSocket/bind.html
-    if (_stopped) {
-      if (serverSocket != null) {
-        unawaited(serverSocket.close());
-        serverSocket = null;
-      }
-      return;
-    }
-    serverSocket.listen((Socket socket) {
-      if (readingFrom != null) {
-        socket.add('Already reading data from ${readingFrom.address}\r\n'.codeUnits);
-        unawaited(socket.close());
-      } else {
-        if (_stopped) {
-          socket.close();
-        } else {
-          readingFrom = socket;
-          _lastTime = null;
-          socket.listen((Uint8List data) async {
-            await receive(data);
-          }, onDone: () {
-            readingFrom = null;
-            firstLineMatched = false;
-          });
-        }
-      };
-    });
+  void reset() {
+    super.reset();
+    firstLineMatched = false;
   }
 
   @override
   Future<void> receiveLine(String line) async {
     if (firstLineMatched) {
       if (line == 'exit') {
-        readingFrom?.add("Goodbye.\n".codeUnits);
-        await(readingFrom?.flush());
-        unawaited(readingFrom.close());
+        await socketReader.send('Goodbye.\r\n');
+        socketReader.closeThisSocket();
         return;
       } else {
         return super.receiveLine(line);
       }
-    }
-    if (line == securityString) {
-      readingFrom?.add('Security string matched.\n'.codeUnits);
-      readingFrom?.add('"exit" will close socket.\n'.codeUnits);
-      await(readingFrom?.flush());
+    } else if (line == securityString) {
+      await socketReader
+          .send('Security string matched.\r\n"exit" will close socket.\r\n');
       firstLineMatched = true;
     } else {
-      readingFrom?.add('Bad security string.\n'.codeUnits);
-      await(readingFrom?.flush());
-      unawaited(readingFrom?.close());
+      await socketReader.send('Bad security string.\r\n');
+      await Future.delayed(Duration(seconds: 5), () => null);
     }
   }
 }
@@ -400,7 +301,6 @@ typedef _ScreenDebugFunction = double Function(
     double time, config.ChartedValue);
 
 class _ScreenDebugDeviceDataSource extends DeviceDataSource {
-  Timer _timer;
   static final _random = Random();
   double _currTime = 0;
   final chartFunctions = List<_ScreenDebugFunction>();
@@ -448,43 +348,48 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
   @override
   void start(DeviceDataListener listener) {
     super.start(listener);
-    assert(_timer == null);
-    _timer = Timer.periodic(Duration(milliseconds: 20), (_) => _tick());
+    unawaited(_sendEvents());
+    // _timer = Timer.periodic(Duration(milliseconds: 20), (_) => _tick());
   }
 
   @override
   void stop() {
     super.stop();
-    _timer.cancel();
-    _timer = null;
   }
 
-  void _tick() {
-    final charted = Float64List(feedSpec.chartedValues.length);
-    for (int i = 0; i < charted.length; i++) {
-      charted[i] = chartFunctions[i](_currTime, feedSpec.chartedValues[i]);
-    }
-    final displayed = List<String>(feedSpec.displayedValues.length);
-    for (int i = 0; i < displayed.length; i++) {
-      final spec = feedSpec.displayedValues[i];
-      if (_currTime >= nextChange[i]) {
-        nextChange[i] = _currTime + _random.nextDouble() * 4;
-        if (_random.nextDouble() < 0.2) {
-          // Go to min or max value 20% of the time
-          if (_random.nextDouble() < 0.5) {
-            lastValue[i] = spec.minValue;
-          } else {
-            lastValue[i] = spec.maxValue;
-          }
-        } else {
-          lastValue[i] = spec.minValue +
-              (spec.maxValue - spec.minValue) * _random.nextDouble();
-        }
+  Future<void> _sendEvents() async {
+    final startTime = DateTime.now();
+    while (running) {
+      final charted = Float64List(feedSpec.chartedValues.length);
+      for (int i = 0; i < charted.length; i++) {
+        charted[i] = chartFunctions[i](_currTime, feedSpec.chartedValues[i]);
       }
-      displayed[i] = spec.formatValue(lastValue[i]);
+      final displayed = List<String>(feedSpec.displayedValues.length);
+      for (int i = 0; i < displayed.length; i++) {
+        final spec = feedSpec.displayedValues[i];
+        if (_currTime >= nextChange[i]) {
+          nextChange[i] = _currTime + _random.nextDouble() * 4;
+          if (_random.nextDouble() < 0.2) {
+            // Go to min or max value 20% of the time
+            if (_random.nextDouble() < 0.5) {
+              lastValue[i] = spec.minValue;
+            } else {
+              lastValue[i] = spec.maxValue;
+            }
+          } else {
+            lastValue[i] = spec.minValue +
+                (spec.maxValue - spec.minValue) * _random.nextDouble();
+          }
+        }
+        displayed[i] = spec.formatValue(lastValue[i]);
+      }
+      final l = _listener;
+      if (l != null) {
+        await l.processDeviceData(DeviceData(_currTime, charted, displayed));
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      _currTime = DateTime.now().difference(startTime).inMilliseconds / 1000.0;
     }
-    _listener?.processDeviceData(DeviceData(_currTime, charted, displayed));
-    _currTime += 0.020;
   }
 }
 

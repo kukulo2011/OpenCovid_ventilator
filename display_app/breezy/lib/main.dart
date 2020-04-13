@@ -1,14 +1,12 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:connectivity/connectivity.dart'
     show Connectivity, ConnectivityResult;
-import 'dart:io' show exit, stdout, File, Directory, NetworkInterface;
+import 'dart:io' show exit, File, Directory, NetworkInterface;
 import 'dart:convert' as convert;
 import 'dart:math' show Random;
-import 'serial_test.dart';
+import 'input_test.dart';
 import 'graphs_screen.dart';
 import 'read_device.dart';
 import 'settings_screen.dart';
@@ -42,11 +40,18 @@ void main() async {
   runApp(MyApp());
 }
 
-
-class Log {
+abstract class Log {
   // TODO:  Send this to an internal buffer, so we can access it from a menu
-  static void writeln([Object o = '']) => stdout.writeln(o);
-  static void write(Object o) => stdout.write(o);
+  static void writeln([Object o = '']) {
+    print(o);
+    for (final l in listeners) {
+      l.notifyWriteln(o);
+    }
+  }
+
+  static final listeners = List<Log>();
+
+  void notifyWriteln(Object o);
 }
 
 class MyApp extends StatelessWidget {
@@ -179,8 +184,8 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                           Navigator.push<void>(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) =>
-                                      SerialTestPage(globals.settings)));
+                                  builder: (context) => InputTestPage(globals,
+                                      DefaultAssetBundle.of(context))));
                         },
                         child: Row(
                           children: <Widget>[
@@ -272,12 +277,11 @@ class _BreezyHomePageState extends State<BreezyHomePage>
         break;
       case InputSource.assetFile:
         return DeviceDataSource.fromAssetFile(
-            feed, DefaultAssetBundle.of(context), "assets/demo.log");
+            globals.settings, feed, DefaultAssetBundle.of(context));
       case InputSource.screenDebug:
         return DeviceDataSource.screenDebug(globals.configuration.feed);
       case InputSource.serverSocket:
-        return DeviceDataSource.serverSocket(
-            globals.settings, globals.configuration.feed);
+        return DeviceDataSource.serverSocket(globals);
     }
     return null;
   }

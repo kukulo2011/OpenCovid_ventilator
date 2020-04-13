@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 if [ $# != 4 ] ; then
     base="`dirname $0`"
@@ -24,5 +24,5 @@ port=$3
 file=$4
 
 
-(echo "foo" ; cat ../../firmware/Misc/example_measurements/breezy-example3.log; echo ""; echo "exit") | nc localhost 7777
+(echo "$security" ; cat ../../firmware/Misc/example_measurements/breezy-example3.log; echo ""; echo "exit") | nc localhost 7777
 
