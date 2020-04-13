@@ -1,7 +1,7 @@
 name: breezy
 description: Breezy - Emergency Ventilator Display
 
-version: 1.1.1+2        # After '+' is the version code, for the app store
+version: 0.1.2+2        # After '+' is the version code, for the app store
 
 environment:
   sdk: ">=2.1.0 <3.0.0"
