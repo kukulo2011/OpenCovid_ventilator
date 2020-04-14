@@ -341,7 +341,7 @@ Screen _defaultScreen() {
         color: charts.MaterialPalette.deepOrange.shadeDefault.lighter,
         displayedTimeTicks: 11,
         label: 'PRESSURE cmH2O',
-        labelHeightFactor: labelHeight/2,
+        labelHeightFactor: labelHeight / 2,
         minValue: -10.0,
         maxValue: 50.0),
     RollingChart(
@@ -350,7 +350,7 @@ Screen _defaultScreen() {
         color: charts.MaterialPalette.green.shadeDefault.lighter,
         displayedTimeTicks: 11,
         label: 'FLOW l/min',
-        labelHeightFactor: labelHeight/2,
+        labelHeightFactor: labelHeight / 2,
         minValue: -100.0,
         maxValue: 100.0),
     RollingChart(
@@ -359,7 +359,7 @@ Screen _defaultScreen() {
         color: charts.MaterialPalette.blue.shadeDefault.lighter,
         displayedTimeTicks: 11,
         label: 'VOLUME ml',
-        labelHeightFactor: labelHeight/2,
+        labelHeightFactor: labelHeight / 2,
         minValue: 0.0,
         maxValue: 800.0),
   ];
@@ -368,7 +368,7 @@ Screen _defaultScreen() {
     ValueBox(
         valueIndex: 0,
         label: 'Ppeak',
-        labelHeightFactor: labelHeight/2,
+        labelHeightFactor: labelHeight / 2,
         units: 'cmH2O',
         format: '##.#',
         color: material.Colors.orange.shade300),

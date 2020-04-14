@@ -195,8 +195,7 @@ class SlidingDeque<T extends TimedData> implements WindowedData<T> {
   /// Give a view of the data within the window needed by a sliding display.
   @override
   List<T> get window {
-    _window ??= _SlidingDequeWindowIterable(this)
-        .toList(growable: false);
+    _window ??= _SlidingDequeWindowIterable(this).toList(growable: false);
     return _window;
   }
 }

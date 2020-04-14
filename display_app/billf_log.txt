@@ -93,3 +93,34 @@ is complicated.
 
 Ah - it seems that iOS only supports BLE.  There is a dart library
 for Bluetooth classic - see issue.
+
+13 Apr. 2020
+============
+
+Taking a second look at bluetooth classic (and not bluetooth LE, for
+now).  On Linux, set up /etc/systemd/system/dbus-org.bluez.service, adding
+"--compat" to bluetoothd:
+    ExecStart=/usr/lib/bluetooth/bluetoothd --compat
+I didn't do "systemctl daemon-reload" and "systemctl restart bluetooth"
+because I've rebooted since changing systemd.
+
+Next, as root, I did this:
+
+    sdptool add --channel=7 SP
+    rfcomm listen /dev/rfcomm0 7
+
+This waits.  Then, on Android, I launched "Serial Bluetooth Terminal".  This 
+phone had previously been paired with my computer.  Under "Devices, 
+Bluetooth classic" I picked the Linux computer.  It connects, and I can
+send and receive data via /dev/rfcomm0.
+
+Picked https://pub.dev/packages/flutter_bluetooth_serial for Bluetooth
+Classic (Android-only - bluetooth classic is possible on iOS, it seems, but
+it may be complicated).  
+
+"rfcomm release 0" is sometimes necessary on the Linux side after a connection,
+it seems:  https://www.linuxquestions.org/questions/linux-software-2/can%27t-create-rfcomm-tty-address-already-in-use-4175615608/
+
+After chmoding /dev/rfcomm0 to allow user-level write, bluetooth_stress_test.sh
+works, and flow control works fine!
+

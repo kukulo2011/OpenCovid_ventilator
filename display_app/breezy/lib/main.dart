@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:connectivity/connectivity.dart'
     show Connectivity, ConnectivityResult;
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
+    show BluetoothDevice, FlutterBluetoothSerial;
 import 'dart:io' show exit, File, Directory, NetworkInterface;
 import 'dart:convert' as convert;
 import 'dart:math' show Random;
@@ -84,7 +88,54 @@ class BreezyGlobals {
   final Settings settings = Settings();
   config.BreezyConfiguration configuration =
       config.BreezyConfiguration.defaultConfig;
-  final deviceAddresses = List<String>();
+  final deviceIPAddresses = List<String>();
+  final bluetoothClassicDevices = List<BluetoothDevice>();
+
+  Future<void> checkNeighborhood() async {
+    deviceIPAddresses.clear();
+    if (NetworkInterface.listSupported) {
+      // false in Android as of this writing :-(
+      final List<NetworkInterface> ifs = await NetworkInterface.list();
+      for (final i in ifs) {
+        for (final a in i.addresses) {
+          deviceIPAddresses.add(a.toString());
+        }
+      }
+      if (deviceIPAddresses.isEmpty) {
+        deviceIPAddresses.add('No local IP address found');
+      }
+    } else {
+      final conn = Connectivity();
+      final result = await conn.checkConnectivity();
+      switch (result) {
+        case ConnectivityResult.wifi:
+          deviceIPAddresses.add(await conn.getWifiIP());
+          break;
+        case ConnectivityResult.mobile:
+          deviceIPAddresses.add('Moblie network, address unknown');
+          break;
+        case ConnectivityResult.none:
+          deviceIPAddresses.add('No local IP address found');
+          break;
+      }
+    }
+    bluetoothClassicDevices.clear();
+    try {
+      List<BluetoothDevice> devices =
+          await FlutterBluetoothSerial.instance.getBondedDevices();
+      bluetoothClassicDevices.addAll(devices);
+      bluetoothClassicDevices.sort((d1, d2) {
+        int r = d1.name.toLowerCase().compareTo(d2.name.toLowerCase());
+        if (r == 0) {
+          r = d1.address.compareTo(d2.address);
+          // If two devices have the same name, this ensures a consistent order.
+        }
+        return r;
+      });
+    } catch (ex) {
+      Log.writeln('Attempt to get bluetooth devices failed with $ex');
+    }
+  }
 }
 
 class _BreezyHomePageState extends State<BreezyHomePage>
@@ -98,37 +149,11 @@ class _BreezyHomePageState extends State<BreezyHomePage>
   }
 
   Future<void> asyncInit() async {
+    await globals.checkNeighborhood();
     if (Settings.settingsFile == null) {
       Directory dir = await getApplicationSupportDirectory();
       Settings.settingsFile = File("${dir.path}/settings.json");
-      await globals.settings.read();
-    }
-    globals.deviceAddresses.clear();
-    if (NetworkInterface.listSupported) {
-      // false in Android as of this writing :-(
-      final List<NetworkInterface> ifs = await NetworkInterface.list();
-      for (final i in ifs) {
-        for (final a in i.addresses) {
-          globals.deviceAddresses.add(a.toString());
-        }
-      }
-      if (globals.deviceAddresses.isEmpty) {
-        globals.deviceAddresses.add('No local IP address found');
-      }
-    } else {
-      final conn = Connectivity();
-      final result = await conn.checkConnectivity();
-      switch (result) {
-        case ConnectivityResult.wifi:
-          globals.deviceAddresses.add(await conn.getWifiIP());
-          break;
-        case ConnectivityResult.mobile:
-          globals.deviceAddresses.add('Moblie network, address unknown');
-          break;
-        case ConnectivityResult.none:
-          globals.deviceAddresses.add('No local IP address found');
-          break;
-      }
+      await globals.settings.read(globals);
     }
   }
 
@@ -196,7 +221,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                         )),
                     PopupMenuItem<void Function()>(
                         value: () async {
-                          var ss = SettingsScreen(globals.settings);
+                          var ss = SettingsScreen(globals);
                           await ss.init();
                           unawaited(Navigator.push<void>(context,
                               MaterialPageRoute(builder: (context) => ss)));
@@ -256,7 +281,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                   ],
                 ),
                 const SizedBox(height: 50),
-                Text('${globals.settings.forUI(globals.deviceAddresses)}')
+                Text('${globals.settings.forUI(globals.deviceIPAddresses)}')
               ],
             ),
           ),
@@ -282,17 +307,25 @@ class _BreezyHomePageState extends State<BreezyHomePage>
         return DeviceDataSource.screenDebug(globals.configuration.feed);
       case InputSource.serverSocket:
         return DeviceDataSource.serverSocket(globals);
+      case InputSource.bluetoothClassic:
+        return DeviceDataSource.bluetoothClassic(globals);
     }
     return null;
   }
 
   @override
   void settingsChanged() {
-    setState(() {});
+    scheduleMicrotask(() => setState(() {}));
   }
 }
 
-enum InputSource { serial, screenDebug, assetFile, serverSocket }
+enum InputSource {
+  serial,
+  screenDebug,
+  assetFile,
+  serverSocket,
+  bluetoothClassic
+}
 
 abstract class SettingsListener {
   void settingsChanged();
@@ -307,10 +340,11 @@ class Settings {
   int _socketPort = 7777;
   String _securityString = UUID.random().toString();
   bool _meterData = true;
+  BluetoothDevice _bluetoothClassicDevice;
 
   Settings();
 
-  Future<void> read() async {
+  Future<void> read(BreezyGlobals globals) async {
     if (await settingsFile.exists()) {
       final str = await settingsFile.readAsString();
       final dynamic json = convert.json.decode(str);
@@ -340,6 +374,11 @@ class Settings {
       if (v != null) {
         _securityString = v as String;
       }
+      v = json['bluetoothClassicDevice'];
+      if (v != null) {
+        _bluetoothClassicDevice = globals.bluetoothClassicDevices
+            .firstWhere((d) => d.address == v, orElse: () => null);
+      }
     }
   }
 
@@ -350,7 +389,8 @@ class Settings {
       'baudRate': _baudRate,
       'meterData': _meterData,
       'socketPort': _socketPort,
-      'securityString': _securityString
+      'securityString': _securityString,
+      'bluetoothClassicDevice': _bluetoothClassicDevice?.address
     };
     final str = convert.json.encode(json);
     await settingsFile.writeAsString(str);
@@ -414,6 +454,13 @@ class Settings {
     _notify();
   }
 
+  BluetoothDevice get bluetoothClassicDevice => _bluetoothClassicDevice;
+
+  set bluetoothClassicDevice(BluetoothDevice d) {
+    _bluetoothClassicDevice = d; // null OK
+    _notify();
+  }
+
   String forUI(List<String> localAddresses) {
     final result = StringBuffer();
     result.writeln("Settings:");
@@ -443,6 +490,12 @@ class Settings {
         for (final s in localAddresses) {
           result.writeln('        $s');
         }
+        break;
+      case InputSource.bluetoothClassic:
+        result.writeln('    Bluetooth Classic/RFCOMM');
+        result
+            .writeln('    Device:  ${bluetoothClassicDevice?.name ?? 'none'}');
+        break;
     }
     return result.toString();
   }

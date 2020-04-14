@@ -41,14 +41,14 @@ class DeviceData {
   final List<String> displayedValues;
   final ChartData chart;
 
-  DeviceData(double timeMS, Float64List chartedValues, this.displayedValues)
+  DeviceData(double timeMS, List<double> chartedValues, this.displayedValues)
       : chart = ChartData(timeMS, chartedValues) {
     assert(displayedValues.length == 11);
   }
 }
 
 class ChartData extends TimedData {
-  final Float64List values;
+  final List<double> values;
   @override
   final double timeMS;
 
@@ -88,8 +88,12 @@ abstract class DeviceDataSource {
   /// A source that opens a server socket, and accepts connections to send
   /// us data.  Useful for debugging.
   static DeviceDataSource serverSocket(BreezyGlobals globals) =>
-      _ServerSocketDataSource(globals.settings, globals.deviceAddresses,
+      _ServerSocketDataSource(globals.settings, globals.deviceIPAddresses,
           globals.configuration.feed);
+
+  /// A source using Bluetooth Classic/rfcomm
+  static DeviceDataSource bluetoothClassic(BreezyGlobals globals) =>
+      _BluetoothClassicDataSource(globals.settings, globals.configuration.feed);
 
   bool get running => _listener != null;
 
@@ -110,12 +114,13 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
   final int _cr = '\r'.codeUnitAt(0);
   static final int _newline = '\n'.codeUnitAt(0);
   static final int _hash = '#'.codeUnitAt(0);
+  static const _resetTimeGap = 40;   // ms
   Settings settings;
   ByteStreamReader reader;
   final bool _meterData;
   final _lineBuffer = StringBuffer();
   int _lastTime; // Last time seen in file.  Starts out null
-  int _currTime = 0; // 64 bits
+  int _currTime = -_resetTimeGap; // 64 bits
   DateTime _startTime;
 
   _ByteStreamDataSource(this.settings, config.DataFeed feed, this._meterData)
@@ -132,8 +137,27 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
 
   @override
   @mustCallSuper
-  void reset() {
+  /// Reset for a new connection from a source that supports multiple
+  /// connections, like a server socket.
+  Future<void> reset() {
+    return _resetTime();
+  }
+
+  Future<void> _resetTime() async {
     _lastTime = null;
+    final charted = List<double>(3);  // full of nulls
+    final displayed = List<String>(11);
+    for (int i = 0; i < displayed.length; i++) {
+      displayed[i] = '';
+    }
+    /*  If we want a gap when there's a reset-time:
+    final l = _listener;
+    if (l != null) {
+      final t = _currTime + _resetTimeGap ~/ 2;
+      return l.processDeviceData(
+        DeviceData(t / 1000.0, charted, displayed));
+    }
+     */
   }
 
   @override
@@ -161,6 +185,8 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
       await Future.delayed(Duration(microseconds: 250), () => null);
       // Just a bit of robustness if we get flooded by comments
       return;
+    } else if ('reset-time' == line) {
+      return _resetTime();
     }
     List<String> parts = line.split(',');
     try {
@@ -200,7 +226,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
           _startTime = DateTime.now();
         }
         if (_lastTime == null) {
-          _currTime += 100;
+          _currTime += _resetTimeGap;
         } else {
           int deltaT = (time - _lastTime) & 0xffff;
           if (deltaT <= 0) {
@@ -271,9 +297,9 @@ class _ServerSocketDataSource extends _ByteStreamDataSource {
   }
 
   @override
-  void reset() {
-    super.reset();
+  Future<void> reset() {
     firstLineMatched = false;
+    return super.reset();
   }
 
   @override
@@ -390,6 +416,16 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
       }
       _currTime = DateTime.now().difference(startTime).inMilliseconds / 1000.0;
     }
+  }
+}
+
+class _BluetoothClassicDataSource extends _ByteStreamDataSource {
+  _BluetoothClassicDataSource(Settings settings, config.DataFeed feed)
+      : super(settings, feed, settings.meterData);
+
+  @override
+  ByteStreamReader createReader(Settings settings) {
+    return BluetoothClassicReader(settings, this);
   }
 }
 

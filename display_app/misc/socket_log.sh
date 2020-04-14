@@ -19,10 +19,10 @@ if [ $# != 4 ] ; then
 fi
 
 security=$1
-addr=$2
+host=$2
 port=$3
 file=$4
 
 
-(echo "$security" ; cat ../../firmware/Misc/example_measurements/breezy-example3.log; echo ""; echo "exit") | nc localhost 7777
+(echo "$security" ; cat $file; echo ""; echo "exit") | nc $host $port
 

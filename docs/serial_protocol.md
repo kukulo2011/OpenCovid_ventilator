@@ -5,7 +5,7 @@ app does not control the ventilator, because manipulating a touchscreen while
 wearing gloves is not suitable.  For this reason, it's a one-directional
 protocol:  The controller just continuously sends updates.
 
-The protocol is a simple text-based protocol, with one data sample per line.
+The protocol is a text-based protocol, with one data sample per line.
 Output from the controller looks like this:
 ```
 breezy,1,44741, 0.00,21.13,66.33,  0.0, 0, 0, 0,  0, 0.00, 0.0, 0.0, 0.0,  0,  0,25370
@@ -68,3 +68,9 @@ http://srecord.sourceforge.net/crc16-ccitt.html.
 
 Lines beginning with "#" will be treated as comments:  They will
 be discarded without logging a parse error.
+
+A line that consists entirely of the string `reset-clock` will reset
+the time calculation.  The next sample after this line will be displayed
+at a time 40 ms after the last sample, regardless of the time value.
+This can be useful e.g. for playing back captured data on a loop,
+for demo purposes.

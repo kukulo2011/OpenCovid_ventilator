@@ -16,8 +16,16 @@ dependencies:
   screen: ^0.0.5
   intl: ^0.16.1
   path_provider: ^1.6.5
-    # https://pub.dev/packages/flutter_blue is a good candidate if we want
-    # to add bluetooth support
+  flutter_bluetooth_serial: ^0.2.2
+      # Android-only support for Bluetooth Classic.  iOS apparently doesn't support
+      # Bluetooth Classic at all.  Some work might be required to ensure graceful
+      # failure on iOS; as of this writing, this hasn't been tested.
+
+
+      # https://pub.dev/packages/flutter_blue is a good candidate if we want
+      # to add bluetoothi LE support.  However, see
+      # https://github.com/pauldemarco/flutter_blue/issues/531
+
 
 dev_dependencies:
   flutter_test:

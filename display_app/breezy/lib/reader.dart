@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show AssetBundle;
 import 'package:pedantic/pedantic.dart' show unawaited;
 import 'package:usb_serial/usb_serial.dart';
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
+    show BluetoothConnection, FlutterBluetoothSerial;
 
 import 'main.dart' show Log, Settings;
 import 'dart:async';
@@ -41,7 +43,7 @@ abstract class ByteStreamListener {
 
   // Reset the listener because the stream ended.  The reader should prepare
   // for a (potential) new stream.
-  void reset();
+  Future<void> reset();
 }
 
 abstract class ByteStreamReader {
@@ -156,7 +158,8 @@ abstract class ByteStreamReader {
     }
   }
 
-  void _reset() => listener.reset();
+  @mustCallSuper
+  Future<void> _reset() => listener.reset();
 }
 
 class SerialReader extends ByteStreamReader {
@@ -261,14 +264,18 @@ class ServerSocketReader extends ByteStreamReader {
         } else {
           _readingFrom = socket;
           lastAddress = socket.address;
-          _readStream(socket, onDone: () {
+          unawaited(_readStream(socket, onDone: () {
             socket.destroy();
-            _readingFrom = null;
-            _reset();
-          });
+            unawaited(_reset());
+          }));
         }
       }
     });
+  }
+
+  Future<void> _reset() async {
+    await super._reset();
+    _readingFrom = null;
   }
 
   @override
@@ -318,7 +325,42 @@ class AssetFileReader extends ByteStreamReader {
       // Make a stream so that flow control works.
       await _readStream(stream);
       // Just keep time marching forward, while looping through the data.
-      _reset();
+      await _reset();
     }
+  }
+}
+
+class BluetoothClassicReader extends ByteStreamReader {
+  BluetoothClassicReader(Settings settings, ByteStreamListener listener)
+      : super(settings, listener);
+
+  final fbs = FlutterBluetoothSerial.instance;
+
+  @override
+  Future<void> start() async {
+    if (stopped) {
+      return;
+    }
+    final device = settings.bluetoothClassicDevice;
+    if (device == null) {
+      Log.writeln('No Bluetooth Classic device selected.');
+      Log.writeln('Please select one in Settings.');
+      return;
+    }
+    try {
+      while (!stopped) {
+        Log.writeln('Connecting to ${device.name} (${device.address})...');
+        BluetoothConnection conn =
+        await BluetoothConnection.toAddress(device.address);
+        await _readStream(conn.input, onDone: () {});
+      }
+    } catch (ex) {
+      Log.writeln('Bluetooth error: $ex');
+    }
+  }
+
+  @override
+  stop() {
+    super.stop();
   }
 }

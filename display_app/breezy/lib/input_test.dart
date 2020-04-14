@@ -67,7 +67,10 @@ class _InputTestPageState extends State<InputTestPage>
         break;
       case InputSource.serverSocket:
         reader = ServerSocketReader(
-            widget.globals.settings, this, widget.globals.deviceAddresses);
+            widget.globals.settings, this, widget.globals.deviceIPAddresses);
+        break;
+      case InputSource.bluetoothClassic:
+        reader = BluetoothClassicReader(widget.globals.settings, this);
         break;
     }
     if (reader == null) {
@@ -115,7 +118,8 @@ class _InputTestPageState extends State<InputTestPage>
 
   void _limitTextSize() {
     final int len = _text.length;
-    if (len > (_maxTextSize + (_maxTextSize >> 1))) {  // 50% too big is OK
+    if (len > (_maxTextSize + (_maxTextSize >> 1))) {
+      // 50% too big is OK
       final int sz = _maxTextSize;
       StringBuffer sb = StringBuffer();
       sb.write(_text.toString().substring(len - sz, len));
@@ -168,10 +172,10 @@ class _InputTestPageState extends State<InputTestPage>
       lastWait = bytesReceived;
       _waitingForBuild = Completer<void>();
     }
-    write(b.toString());    // Doesn't go to log
+    write(b.toString()); // Doesn't go to log
     if (_waitingForBuild != null) {
       await _waitingForBuild.future;
-      assert(_waitingForBuild == null);  // Yes, I mean that.
+      assert(_waitingForBuild == null); // Yes, I mean that.
       // Give the UI an extra tenth of a second.  It might help...
       await Future.delayed(Duration(milliseconds: 100), () => null);
     }
@@ -183,7 +187,7 @@ class _InputTestPageState extends State<InputTestPage>
   }
 
   @override
-  void reset() {
+  Future<void> reset() async {
     if (bytesReceived > 0) {
       pauseUntil = DateTime.now().add(Duration(seconds: 10));
     }
