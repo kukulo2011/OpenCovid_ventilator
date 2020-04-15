@@ -3,7 +3,7 @@ import 'package:flutter/services.dart' show AssetBundle;
 import 'package:pedantic/pedantic.dart' show unawaited;
 
 import 'main.dart' show Log, Settings, BreezyGlobals;
-import 'dequeues.dart' show TimedData;
+import 'deques.dart' show TimedData;
 import 'configure.dart' as config;
 import 'reader.dart';
 import 'dart:async';
@@ -145,12 +145,12 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
 
   Future<void> _resetTime() async {
     _lastTime = null;
+    /*  If we want a gap when there's a reset-time:
     final charted = List<double>(3);  // full of nulls
     final displayed = List<String>(11);
     for (int i = 0; i < displayed.length; i++) {
       displayed[i] = '';
     }
-    /*  If we want a gap when there's a reset-time:
     final l = _listener;
     if (l != null) {
       final t = _currTime + _resetTimeGap ~/ 2;

@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:charts_flutter/flutter.dart' as charts;
 import 'fitted_text.dart';
-import 'dequeues.dart';
+import 'deques.dart';
 
 /*
 MIT License
@@ -31,10 +31,9 @@ SOFTWARE.
 /// A rolling chart.  The X axis is time, from 0 to windowSize.  Numbers
 /// aren't given, and there's a 1/2 second black "gap" marking the current
 /// time.
-class RollingChart<D extends TimedData> extends StatelessWidget {
-  final double windowSize;
-  final List<D> _data;
-  final RollingChartSelector _selector;
+class TimeChart<D extends TimedData> extends StatelessWidget {
+  final WindowedData<D> _data;
+  final TimeChartSelector _selector;
   final String _label;
   final double _labelHeightFactor;
   final double _minValue;
@@ -44,10 +43,9 @@ class RollingChart<D extends TimedData> extends StatelessWidget {
   final charts.Color graphOutOfRangeColor;
 
   /// [data] must be sorted by time.remainder(window size).
-  RollingChart(
-      {@required this.windowSize,
-      @required List<D> data,
-      @required RollingChartSelector selector,
+  TimeChart(
+      {@required WindowedData<D> data,
+      @required TimeChartSelector selector,
       @required String label,
       double labelHeightFactor = 0.14,
       @required double minValue,
@@ -82,6 +80,8 @@ class RollingChart<D extends TimedData> extends StatelessWidget {
     }
     final int labelSpaceFlex =
         max(1, min(30, (100 * _labelHeightFactor / 1.4).round()));
+    final timeOffset = _data.timeOffset;
+    final windowSize = _data.windowSize;
 
     return Container(
         decoration: BoxDecoration(
@@ -124,7 +124,8 @@ class RollingChart<D extends TimedData> extends StatelessWidget {
                               return graphColor;
                             }
                           },
-                          domainFn: (d, _) => d.timeMS.remainder(windowSize),
+                          domainFn: (d, _) =>
+                              (d.timeMS - timeOffset).remainder(windowSize),
                           measureFn: (d, _) {
                             final v = _selector.getValue(d);
                             if (v == null) {
@@ -137,7 +138,7 @@ class RollingChart<D extends TimedData> extends StatelessWidget {
                               return v;
                             }
                           },
-                          data: _data)
+                          data: _data.window)
                     ],
                         primaryMeasureAxis: charts.NumericAxisSpec(
                           viewport: charts.NumericExtents(_minValue, _maxValue),
@@ -170,6 +171,6 @@ class RollingChart<D extends TimedData> extends StatelessWidget {
   }
 }
 
-abstract class RollingChartSelector<D extends TimedData> {
+abstract class TimeChartSelector<D extends TimedData> {
   double getValue(D data);
 }

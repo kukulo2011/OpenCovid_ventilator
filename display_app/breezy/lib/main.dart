@@ -194,7 +194,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                                 MaterialPageRoute(
                                     builder: (context) => GraphsScreen(
                                         dataSource: src,
-                                        feed: globals.configuration.feed)));
+                                        config: globals.configuration)));
                           }
                         },
                         child: Row(
@@ -274,7 +274,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                                     builder: (context) => GraphsScreen(
                                         // dataSource: DeviceDataSource.screenDebug()
                                         dataSource: src,
-                                        feed: globals.configuration.feed))));
+                                        config: globals.configuration))));
                           }
                         }),
                     Spacer(),

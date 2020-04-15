@@ -3,7 +3,7 @@ import 'package:screen/screen.dart' show Screen;
 import 'package:pedantic/pedantic.dart';
 import 'dart:async';
 import 'configure.dart' as config;
-import 'dequeues.dart';
+import 'deques.dart';
 import 'read_device.dart';
 import 'main.dart' show Log;
 
@@ -41,43 +41,28 @@ SOFTWARE.
 ///
 class GraphsScreen extends StatefulWidget {
   final DeviceDataSource _dataSource;
-  final config.DataFeed _feed;
+  final config.BreezyConfiguration _config;
 
   GraphsScreen(
       {Key key,
       @required DeviceDataSource dataSource,
-      @required config.DataFeed feed})
+      @required config.BreezyConfiguration config})
       : this._dataSource = dataSource,
-        this._feed = feed,
+        this._config = config,
         super(key: key);
 
   @override
-  _GraphsScreenState createState() => _GraphsScreenState(_dataSource, _feed);
+  _GraphsScreenState createState() => _GraphsScreenState(_dataSource, _config.feed);
 }
 
 class HistoricalData {
   DeviceData _current;
-  final _indexMap = Map<List<Object>, int>();
-  final _deques = List<WindowedData<ChartData>>();
+  final List<WindowedData<ChartData>> _deques;
+
+  HistoricalData(config.DataFeed feed) :
+    this._deques = feed.createDeques();
 
   DeviceData get current => _current;
-
-  int getIndexFor(bool rolling, double timeSpan, int maxNumValues) {
-    final key = [rolling, timeSpan, maxNumValues];
-    int result = _indexMap[key];
-    if (result == null) {
-      result = _deques.length;
-      if (rolling) {
-        final d = RollingDeque<ChartData>(maxNumValues + 1, timeSpan,
-            timeSpan / 20, (double time) => ChartData.dummy(time));
-        _deques.add(d);
-      } else {
-        final d = SlidingDeque<ChartData>(maxNumValues, timeSpan);
-        _deques.add(d);
-      }
-    }
-    return result;
-  }
 
   void receive(DeviceData data) {
     _current = data;
@@ -86,31 +71,27 @@ class HistoricalData {
     }
   }
 
-  List<ChartData> getWindow(int index) => _deques[index].window;
-
-  double getWindowSize(int index) => _deques[index].windowSize;
+  WindowedData<ChartData> getDeque(int index) => _deques[index];
 }
 
 class _GraphsScreenState extends State<GraphsScreen>
     implements DeviceDataListener {
   final DeviceDataSource _dataSource;
-  final HistoricalData _data = HistoricalData();
+  final HistoricalData _data;
   static final _borderColor = Colors.grey[700];
-  final config.Screen screen = config.Screen.defaultScreens[0]; // TODO
+  config.Screen screen;
   Completer<void> _waitingForBuild;
   DateTime _lastBuild = DateTime.now(); // never null
 
-  _GraphsScreenState(this._dataSource, config.DataFeed feed) {
-    int i = _data.getIndexFor(true, 10, 500);
-    assert(i == 0);
-  }
+  _GraphsScreenState(this._dataSource, config.DataFeed feed) :
+    this._data = HistoricalData(feed);
 
   @override
   void initState() {
     super.initState();
+    screen = widget._config.screens[0]; // TODO - more screens?
     _dataSource.start(this);
     unawaited(Screen.keepOn(true));
-    screen.init(); // TODO:  Move where this belongs
   }
 
   @override

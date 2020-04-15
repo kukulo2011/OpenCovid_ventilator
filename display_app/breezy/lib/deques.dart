@@ -33,6 +33,7 @@ abstract class WindowedData<T> {
   void append(T e);
   double get windowSize;
   List<T> get window;
+  double get timeOffset;
 }
 
 /// An efficient implementation of a Deque for "rolling" data.  Customers must
@@ -112,6 +113,9 @@ class RollingDeque<T extends TimedData> implements WindowedData<T> {
         .toList(growable: false);
     return _window;
   }
+
+  @override
+  double get timeOffset => 0;
 }
 
 class _RollingDequeWindowIterable<T extends TimedData> extends IterableBase<T> {
@@ -172,8 +176,8 @@ class SlidingDeque<T extends TimedData> implements WindowedData<T> {
   void append(T e) {
     _window = null; // Invalidate cached value
     assert(length == 0 || this[length - 1].timeMS < e.timeMS);
-    double earliestValid = e.timeMS - windowSize;
-    while (length > 0 && this[0].timeMS < earliestValid) {
+    double tooEarly = e.timeMS - windowSize;
+    while (length > 0 && this[0].timeMS <= tooEarly) {
       _list[_firstIndex++] = null;
       _firstIndex %= _list.length;
       length--;
@@ -198,6 +202,9 @@ class SlidingDeque<T extends TimedData> implements WindowedData<T> {
     _window ??= _SlidingDequeWindowIterable(this).toList(growable: false);
     return _window;
   }
+
+  @override
+  double get timeOffset => (length == 0) ? 0.0 : first.timeMS;
 }
 
 class _SlidingDequeWindowIterable<T extends TimedData> extends IterableBase<T> {

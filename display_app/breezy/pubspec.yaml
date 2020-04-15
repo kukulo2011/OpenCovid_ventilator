@@ -16,6 +16,7 @@ dependencies:
   screen: ^0.0.5
   intl: ^0.16.1
   path_provider: ^1.6.5
+  quiver: ^2.0.5
   flutter_bluetooth_serial: ^0.2.2
       # Android-only support for Bluetooth Classic.  iOS apparently doesn't support
       # Bluetooth Classic at all.  Some work might be required to ensure graceful
