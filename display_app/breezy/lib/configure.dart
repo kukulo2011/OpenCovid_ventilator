@@ -49,14 +49,14 @@ class BreezyConfiguration {
   static BreezyConfiguration defaultConfig = _createDefault();
 
   static BreezyConfiguration _createDefault() {
-    final mapper = _DequeIndexMapper();
-    final screens = Screen.defaultScreens(mapper);
-    return BreezyConfiguration(
-        name: 'default', screens: screens, feed: DataFeed.defaultFeed(mapper));
+    final feed = _defaultFeed();
+    final screens = Screen.defaultScreens(feed);
+    return BreezyConfiguration(name: 'default', screens: screens, feed: feed);
   }
 
   Map<String, Object> toJson() {
     return {
+      'type': 'BreezyConfiguration',
       'name': name,
       'feed': feed.toJson(),
       'screens': screens.map((s) => s.toJson()).toList(growable: false)
@@ -86,7 +86,6 @@ class _DequeSelector {
 /// A class to build up a deque index map, to map the characteristics
 /// of needed deques to their eventual indices in HistoricalData.
 class _DequeIndexMapper {
-  bool screensInitialized = false;
   final dequeIndexMap = Map<_DequeSelector, int>();
 
   int getDequeIndex(bool isRolling, double timeSpan, int maxNumValues) {
@@ -118,31 +117,6 @@ class DataFeed {
       @required this.dequeIndexMap,
       @required this.checksumIsOptional});
 
-  static DataFeed defaultFeed(_DequeIndexMapper mapper) {
-    assert(mapper.screensInitialized);
-    return DataFeed(
-        checksumIsOptional: true,
-        chartedValues: [
-          ChartedValue(-10, 50),
-          ChartedValue(-100, 100),
-          ChartedValue(0, 800)
-        ],
-        displayedValues: [
-          FormattedValue('#0.0', 0, 99.9),
-          FormattedValue('#0.0', 0, 99.9),
-          FormattedValue('#0.0', 0, 99.9),
-          FormattedValue('#0.0', 0, 99.9),
-          FormattedValue('##0', 0, 100.0),
-          FormattedValue('#0.0', 0, 99.9),
-          RatioValue('0.0', 0.5, 2),
-          FormattedValue('#0.0', 0, 99.9),
-          FormattedValue('#0.0', 0, 99.9),
-          FormattedValue('###0', 0, 9999),
-          FormattedValue('###0', 0, 9999)
-        ],
-        dequeIndexMap: mapper.dequeIndexMap);
-  }
-
   Map<String, Object> toJson() {
     return null; // TODO
   }
@@ -165,16 +139,18 @@ class FormattedValue {
   final NumberFormat format;
   final double minValue;
   final double maxValue;
+  final ValueBox displayer;
 
-  FormattedValue(String format, this.minValue, this.maxValue)
+  FormattedValue(String format, this.minValue, this.maxValue, this.displayer)
       : this.format = NumberFormat(format);
 
   String formatValue(double value) => format.format(value);
 }
 
 class RatioValue extends FormattedValue {
-  RatioValue(String format, double minValue, double maxValue)
-      : super(format, minValue, maxValue);
+  RatioValue(
+      String format, double minValue, double maxValue, ValueBox displayer)
+      : super(format, minValue, maxValue, displayer);
   String formatValue(double value) {
     if (value >= 1.0) {
       return format.format(value) + ':1';
@@ -187,17 +163,16 @@ class RatioValue extends FormattedValue {
 class ChartedValue {
   final double minValue;
   final double maxValue;
+  final TimeChart displayer;
 
-  const ChartedValue(this.minValue, this.maxValue);
+  const ChartedValue(this.minValue, this.maxValue, this.displayer);
 }
 
 class Screen {
-  static List<Screen> defaultScreens(_DequeIndexMapper mapper) {
-    assert(!mapper.screensInitialized);
-    mapper.screensInitialized = true;
-    final result = [_defaultScreen()];
+  static List<Screen> defaultScreens(DataFeed feed) {
+    final result = [_defaultScreen(feed)];
     for (final s in result) {
-      s.init(mapper);
+      s.init();
     }
     return result;
   }
@@ -215,10 +190,10 @@ class Screen {
     assert(landscape != null);
   }
 
-  void init(_DequeIndexMapper mapper) {
-    portrait.init(null, mapper);
+  void init() {
+    portrait.init(null);
     if (portrait != landscape) {
-      landscape.init(null, mapper);
+      landscape.init(null);
     }
   }
 
@@ -236,7 +211,7 @@ abstract class ScreenValue {
 
   /// [parent] is the row or column that contains us, or null if we're
   @mustCallSuper
-  void init(ScreenContainer parent, _DequeIndexMapper mapper) {
+  void init(ScreenContainer parent) {
     hasParent = parent != null;
   }
 
@@ -277,10 +252,10 @@ abstract class ScreenContainer extends ScreenValue {
   ScreenContainer({@required int flex, @required this.content}) : super(flex);
 
   @override
-  void init(ScreenContainer parent, _DequeIndexMapper mapper) {
-    super.init(parent, mapper);
+  void init(ScreenContainer parent) {
+    super.init(parent);
     for (final c in content) {
-      c.init(this, mapper);
+      c.init(this);
     }
   }
 
@@ -298,8 +273,8 @@ class ScreenColumn extends ScreenContainer {
       : super(flex: flex, content: content);
 
   @override
-  void init(ScreenContainer parent, _DequeIndexMapper mapper) {
-    super.init(parent, mapper);
+  void init(ScreenContainer parent) {
+    super.init(parent);
     if (parent is ScreenColumn) {
       throw Exception("A column can't contain another column");
     }
@@ -314,8 +289,8 @@ class ScreenRow extends ScreenContainer {
       : super(flex: flex, content: content);
 
   @override
-  void init(ScreenContainer parent, _DequeIndexMapper mapper) {
-    super.init(parent, mapper);
+  void init(ScreenContainer parent) {
+    super.init(parent);
     if (parent is ScreenRow) {
       throw Exception("A row can't contain another row");
     }
@@ -325,7 +300,22 @@ class ScreenRow extends ScreenContainer {
       _wrapIfNeeded(material.Row(children: _buildChildren(data)));
 }
 
-class ValueBox extends ScreenValue {
+class DataWidget extends ScreenValue {
+  final DataDisplayer displayer;
+
+  DataWidget({int flex = 1, @required this.displayer}) : super(flex);
+
+  @override
+  material.Widget build(HistoricalData data) {
+    return _wrapIfNeeded(displayer.build(data));
+  }
+}
+
+abstract class DataDisplayer {
+  material.Widget build(HistoricalData data);
+}
+
+class ValueBox implements DataDisplayer {
   final int valueIndex;
   final String label;
   final double labelHeightFactor;
@@ -335,48 +325,28 @@ class ValueBox extends ScreenValue {
   final String prefix;
   final String postfix;
   ValueBox(
-      {int flex = 1,
-      @required this.valueIndex,
+      {@required this.valueIndex,
       @required this.label,
       @required this.labelHeightFactor,
       @required this.units,
       @required this.format,
       @required this.color,
       this.prefix,
-      this.postfix})
-      : super(flex);
+      this.postfix});
 
   @override
-  material.Widget build(HistoricalData data) {
-    final vb = ui.ValueBox(
-        value: data.current?.displayedValues?.elementAt(valueIndex),
-        label: label,
-        labelHeightFactor: labelHeightFactor,
-        format: format,
-        color: color,
-        units: units,
-        prefix: prefix,
-        postfix: postfix);
-    return _wrapIfNeeded(vb);
-  }
-
-  /// Convenience method for creating the same ValueBox with a different
-  /// flex.  This is helpful for having different portrait/landscape
-  /// layouts.
-  ValueBox withFlex(int newFlex) => ValueBox(
-      flex: newFlex,
-      valueIndex: valueIndex,
+  material.Widget build(HistoricalData data) => ui.ValueBox(
+      value: data.current?.displayedValues?.elementAt(valueIndex),
       label: label,
       labelHeightFactor: labelHeightFactor,
-      units: units,
       format: format,
       color: color,
+      units: units,
       prefix: prefix,
       postfix: postfix);
 }
 
-class TimeChart extends ScreenValue
-    implements ui.TimeChartSelector<ChartData> {
+class TimeChart implements DataDisplayer, ui.TimeChartSelector<ChartData> {
   final bool rolling;
   final double minValue;
   final double maxValue;
@@ -386,12 +356,11 @@ class TimeChart extends ScreenValue
   final charts.Color color;
   final String label;
   final double labelHeightFactor;
-  int _dequeIndex = -1;
+  final int _dequeIndex;
   final int valueIndex;
 
   TimeChart(
-      {int flex = 1,
-      this.rolling = true,
+      {this.rolling = true,
       @required this.minValue,
       @required this.maxValue,
       @required this.timeSpan,
@@ -400,36 +369,14 @@ class TimeChart extends ScreenValue
       @required this.color,
       @required this.label,
       @required this.labelHeightFactor,
-      @required this.valueIndex})
-      : super(flex);
+      @required this.valueIndex,
+      @required _DequeIndexMapper mapper})
+      : _dequeIndex = mapper.getDequeIndex(rolling, timeSpan, maxNumValues);
 
-  /// Convenience method for creating the same ValueBox with a different
-  /// flex.  This is helpful for having different portrait/landscape
-  /// layouts.
-  TimeChart withFlex(int newFlex) => TimeChart(
-      flex: newFlex,
-      rolling: rolling,
-      minValue: minValue,
-      maxValue: maxValue,
-      timeSpan: timeSpan,
-      maxNumValues: maxNumValues,
-      displayedTimeTicks: displayedTimeTicks,
-      color: color,
-      label: label,
-      labelHeightFactor: labelHeightFactor,
-      valueIndex: valueIndex);
-
-  @override
-  void init(ScreenContainer parent, _DequeIndexMapper mapper) {
-    super.init(parent, mapper);
-    _dequeIndex = mapper.getDequeIndex(rolling, timeSpan, maxNumValues);
-  }
-
-  @override
   material.Widget build(HistoricalData data) {
     final WindowedData<ChartData> deque = data.getDeque(_dequeIndex);
     assert(deque.windowSize == timeSpan);
-    final tc = ui.TimeChart<ChartData>(
+    return ui.TimeChart<ChartData>(
         selector: this,
         label: label,
         labelHeightFactor: labelHeightFactor,
@@ -438,168 +385,268 @@ class TimeChart extends ScreenValue
         maxValue: maxValue,
         graphColor: color,
         data: deque);
-    return _wrapIfNeeded(tc);
   }
 
   @override
   double getValue(ChartData data) => data.values?.elementAt(valueIndex);
 }
 
-Screen _defaultScreen() {
+DataFeed _defaultFeed() {
+  final mapper = _DequeIndexMapper();
   final labelHeight = 0.24;
-  final chartedValues = [
-    TimeChart(
-        valueIndex: 0,
-        color: charts.MaterialPalette.deepOrange.shadeDefault.lighter,
-        displayedTimeTicks: 11,
-        timeSpan: 10,
-        maxNumValues: 500,
-        label: 'PRESSURE cmH2O',
-        labelHeightFactor: labelHeight / 2,
-        minValue: -10.0,
-        maxValue: 50.0),
-    TimeChart(
-        valueIndex: 1,
-        color: charts.MaterialPalette.green.shadeDefault.lighter,
-        displayedTimeTicks: 11,
-        timeSpan: 10,
-        maxNumValues: 500,
-        label: 'FLOW l/min',
-        labelHeightFactor: labelHeight / 2,
-        minValue: -100.0,
-        maxValue: 100.0),
-    TimeChart(
-        valueIndex: 2,
-        color: charts.MaterialPalette.blue.shadeDefault.lighter,
-        displayedTimeTicks: 11,
-        timeSpan: 10,
-        maxNumValues: 500,
-        label: 'VOLUME ml',
-        labelHeightFactor: labelHeight / 2,
-        minValue: 0.0,
-        maxValue: 800.0),
-  ];
+  return DataFeed(
+      checksumIsOptional: true,
+      chartedValues: [
+        ChartedValue(
+          -10,
+          50,
+          TimeChart(
+              valueIndex: 0,
+              color: charts.MaterialPalette.deepOrange.shadeDefault.lighter,
+              displayedTimeTicks: 11,
+              timeSpan: 10,
+              maxNumValues: 500,
+              label: 'PRESSURE cmH2O',
+              labelHeightFactor: labelHeight / 2,
+              minValue: -10.0,
+              maxValue: 50.0,
+              mapper: mapper),
+        ),
+        ChartedValue(
+          -100,
+          100,
+          TimeChart(
+              valueIndex: 1,
+              color: charts.MaterialPalette.green.shadeDefault.lighter,
+              displayedTimeTicks: 11,
+              timeSpan: 10,
+              maxNumValues: 500,
+              label: 'FLOW l/min',
+              labelHeightFactor: labelHeight / 2,
+              minValue: -100.0,
+              maxValue: 100.0,
+              mapper: mapper),
+        ),
+        ChartedValue(
+          0,
+          800,
+          TimeChart(
+              valueIndex: 2,
+              color: charts.MaterialPalette.blue.shadeDefault.lighter,
+              displayedTimeTicks: 11,
+              timeSpan: 10,
+              maxNumValues: 500,
+              label: 'VOLUME ml',
+              labelHeightFactor: labelHeight / 2,
+              minValue: 0.0,
+              maxValue: 800.0,
+              mapper: mapper),
+        )
+      ],
+      displayedValues: [
+        FormattedValue(
+          '#0.0',
+          0,
+          99.9,
+          ValueBox(
+              valueIndex: 0,
+              label: 'Ppeak',
+              labelHeightFactor: labelHeight / 2,
+              units: 'cmH2O',
+              format: '##.#',
+              color: material.Colors.orange.shade300),
+        ),
+        FormattedValue(
+          '#0.0',
+          0,
+          99.9,
+          ValueBox(
+              valueIndex: 1,
+              label: 'Pmean',
+              labelHeightFactor: labelHeight,
+              units: 'cmH2O',
+              format: '##.#',
+              color: material.Colors.orange.shade300),
+        ),
+        FormattedValue(
+          '#0.0',
+          0,
+          99.9,
+          ValueBox(
+              valueIndex: 2,
+              label: 'PEEP',
+              units: 'cmH2O',
+              labelHeightFactor: labelHeight,
+              format: '##.#',
+              color: material.Colors.orange.shade300),
+        ),
+        FormattedValue(
+          '#0.0',
+          0,
+          99.9,
+          ValueBox(
+              valueIndex: 3,
+              label: 'RR',
+              labelHeightFactor: labelHeight,
+              units: 'b/min',
+              format: '##.#',
+              color: material.Colors.lightGreen),
+        ),
+        FormattedValue(
+          '##0',
+          0,
+          100.0,
+          ValueBox(
+              valueIndex: 4,
+              label: 'O2',
+              labelHeightFactor: labelHeight,
+              units: null,
+              format: '1##',
+              color: material.Colors.lightGreen,
+              postfix: '%'),
+        ),
+        FormattedValue(
+          '#0.0',
+          0,
+          99.9,
+          ValueBox(
+              valueIndex: 5,
+              label: 'Ti',
+              labelHeightFactor: labelHeight,
+              units: 's',
+              format: '##.##',
+              color: material.Colors.lightGreen),
+        ),
+        RatioValue(
+          '0.0',
+          0.5,
+          2,
+          ValueBox(
+              valueIndex: 6,
+              label: 'I:E',
+              labelHeightFactor: labelHeight,
+              units: null,
+              format: '1:#,#', // ',' instead of '.' so it doesn't align
+              color: material.Colors.lightGreen),
+        ),
+        FormattedValue(
+          '#0.0',
+          0,
+          99.9,
+          ValueBox(
+              valueIndex: 7,
+              label: 'MVi',
+              labelHeightFactor: labelHeight,
+              units: 'l/min',
+              format: '##.#',
+              color: material.Colors.lightBlue),
+        ),
+        FormattedValue(
+          '#0.0',
+          0,
+          99.9,
+          ValueBox(
+              valueIndex: 8,
+              label: 'MVe',
+              labelHeightFactor: labelHeight,
+              units: 'l/min',
+              format: '##.#',
+              color: material.Colors.lightBlue),
+        ),
+        FormattedValue(
+          '###0',
+          0,
+          9999,
+          ValueBox(
+              valueIndex: 9,
+              label: 'VTi',
+              labelHeightFactor: labelHeight,
+              units: null,
+              format: '####',
+              color: material.Colors.lightBlue),
+        ),
+        FormattedValue(
+            '###0',
+            0,
+            9999,
+            ValueBox(
+                valueIndex: 10,
+                label: 'VTe',
+                labelHeightFactor: labelHeight,
+                units: 'ml',
+                format: '####',
+                color: material.Colors.lightBlue))
+      ],
+      dequeIndexMap: mapper.dequeIndexMap);
+}
 
-  final displayedValues = [
-    ValueBox(
-        valueIndex: 0,
-        label: 'Ppeak',
-        labelHeightFactor: labelHeight / 2,
-        units: 'cmH2O',
-        format: '##.#',
-        color: material.Colors.orange.shade300),
-    ValueBox(
-        valueIndex: 1,
-        label: 'Pmean',
-        labelHeightFactor: labelHeight,
-        units: 'cmH2O',
-        format: '##.#',
-        color: material.Colors.orange.shade300),
-    ValueBox(
-        valueIndex: 2,
-        label: 'PEEP',
-        units: 'cmH2O',
-        labelHeightFactor: labelHeight,
-        format: '##.#',
-        color: material.Colors.orange.shade300),
-    ValueBox(
-        valueIndex: 3,
-        label: 'RR',
-        labelHeightFactor: labelHeight,
-        units: 'b/min',
-        format: '##.#',
-        color: material.Colors.lightGreen),
-    ValueBox(
-        valueIndex: 4,
-        label: 'O2',
-        labelHeightFactor: labelHeight,
-        units: null,
-        format: '1##',
-        color: material.Colors.lightGreen,
-        postfix: '%'),
-    ValueBox(
-        valueIndex: 5,
-        label: 'Ti',
-        labelHeightFactor: labelHeight,
-        units: 's',
-        format: '##.##',
-        color: material.Colors.lightGreen),
-    ValueBox(
-        valueIndex: 6,
-        label: 'I:E',
-        labelHeightFactor: labelHeight,
-        units: null,
-        format: '1:#,#', // ',' instead of '.' so it doesn't align
-        color: material.Colors.lightGreen),
-    ValueBox(
-        valueIndex: 7,
-        label: 'MVi',
-        labelHeightFactor: labelHeight,
-        units: 'l/min',
-        format: '##.#',
-        color: material.Colors.lightBlue),
-    ValueBox(
-        valueIndex: 8,
-        label: 'MVe',
-        labelHeightFactor: labelHeight,
-        units: 'l/min',
-        format: '##.#',
-        color: material.Colors.lightBlue),
-    ValueBox(
-        valueIndex: 9,
-        label: 'VTi',
-        labelHeightFactor: labelHeight,
-        units: null,
-        format: '####',
-        color: material.Colors.lightBlue),
-    ValueBox(
-        valueIndex: 10,
-        label: 'VTe',
-        labelHeightFactor: labelHeight,
-        units: 'ml',
-        format: '####',
-        color: material.Colors.lightBlue)
-  ];
-
+Screen _defaultScreen(DataFeed feed) {
   final landscape = ScreenRow(content: [
     ScreenColumn(flex: 8, content: [
-      chartedValues[0],
-      chartedValues[1],
-      chartedValues[2],
+      DataWidget(displayer: feed.chartedValues[0].displayer),
+      DataWidget(displayer: feed.chartedValues[1].displayer),
+      DataWidget(displayer: feed.chartedValues[2].displayer),
     ]),
     ScreenColumn(flex: 4, content: [
       ScreenRow(content: [
-        displayedValues[0].withFlex(4),
-        ScreenColumn(flex: 3, content: [displayedValues[1], displayedValues[2]])
+        DataWidget(flex: 4, displayer: feed.displayedValues[0].displayer),
+        ScreenColumn(flex: 3, content: [
+          DataWidget(displayer: feed.displayedValues[1].displayer),
+          DataWidget(displayer: feed.displayedValues[2].displayer),
+        ])
       ]),
       ScreenRow(content: [
-        ScreenColumn(
-            flex: 4, content: [displayedValues[3], displayedValues[4]]),
-        ScreenColumn(flex: 3, content: [displayedValues[5], displayedValues[6]])
+        ScreenColumn(flex: 4, content: [
+          DataWidget(displayer: feed.displayedValues[3].displayer),
+          DataWidget(displayer: feed.displayedValues[4].displayer),
+        ]),
+        ScreenColumn(flex: 3, content: [
+          DataWidget(displayer: feed.displayedValues[5].displayer),
+          DataWidget(displayer: feed.displayedValues[6].displayer),
+        ])
       ]),
       ScreenRow(content: [
-        ScreenColumn(
-            flex: 4, content: [displayedValues[7], displayedValues[8]]),
-        ScreenColumn(
-            flex: 3, content: [displayedValues[9], displayedValues[10]])
+        ScreenColumn(flex: 4, content: [
+          DataWidget(displayer: feed.displayedValues[7].displayer),
+          DataWidget(displayer: feed.displayedValues[8].displayer),
+        ]),
+        ScreenColumn(flex: 3, content: [
+          DataWidget(displayer: feed.displayedValues[9].displayer),
+          DataWidget(displayer: feed.displayedValues[10].displayer),
+        ])
       ]),
     ])
   ]);
 
   final portrait = ScreenRow(content: [
     ScreenColumn(content: [
-      chartedValues[0].withFlex(2),
-      chartedValues[1].withFlex(2),
-      chartedValues[2].withFlex(2),
+      DataWidget(flex: 2, displayer: feed.chartedValues[0].displayer),
+      DataWidget(flex: 2, displayer: feed.chartedValues[1].displayer),
+      DataWidget(flex: 2, displayer: feed.chartedValues[2].displayer),
       ScreenRow(flex: 2, content: [
-        displayedValues[0],
-        ScreenColumn(content: [displayedValues[1], displayedValues[2]]),
-        ScreenColumn(content: [displayedValues[7], displayedValues[8]]),
+        DataWidget(displayer: feed.displayedValues[0].displayer),
+        ScreenColumn(content: [
+          DataWidget(displayer: feed.displayedValues[1].displayer),
+          DataWidget(displayer: feed.displayedValues[2].displayer),
+        ]),
+        ScreenColumn(content: [
+          DataWidget(displayer: feed.displayedValues[7].displayer),
+          DataWidget(displayer: feed.displayedValues[8].displayer),
+        ]),
       ]),
       ScreenRow(flex: 2, content: [
-        ScreenColumn(content: [displayedValues[3], displayedValues[4]]),
-        ScreenColumn(content: [displayedValues[5], displayedValues[6]]),
-        ScreenColumn(content: [displayedValues[9], displayedValues[10]])
+        ScreenColumn(content: [
+          DataWidget(displayer: feed.displayedValues[3].displayer),
+          DataWidget(displayer: feed.displayedValues[4].displayer),
+        ]),
+        ScreenColumn(content: [
+          DataWidget(displayer: feed.displayedValues[5].displayer),
+          DataWidget(displayer: feed.displayedValues[6].displayer),
+        ]),
+        ScreenColumn(content: [
+          DataWidget(displayer: feed.displayedValues[9].displayer),
+          DataWidget(displayer: feed.displayedValues[10].displayer),
+        ])
       ]),
     ])
   ]);

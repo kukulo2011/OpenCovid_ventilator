@@ -125,7 +125,12 @@ class BreezyGlobals {
           await FlutterBluetoothSerial.instance.getBondedDevices();
       bluetoothClassicDevices.addAll(devices);
       bluetoothClassicDevices.sort((d1, d2) {
-        int r = d1.name.toLowerCase().compareTo(d2.name.toLowerCase());
+        int r = 0;
+        if (d1.name != null && d2.name != null) {
+          // This probably never happens - I imagine the library gives
+          // an empty string, and not a null, if the name isn't set.
+          r = d1.name.toLowerCase().compareTo(d2.name.toLowerCase());
+        }
         if (r == 0) {
           r = d1.address.compareTo(d2.address);
           // If two devices have the same name, this ensures a consistent order.
