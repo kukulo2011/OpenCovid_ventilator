@@ -5,8 +5,10 @@ import 'package:usb_serial/usb_serial.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
     show BluetoothConnection, FlutterBluetoothSerial;
 
+import 'configure.dart';
 import 'main.dart' show Log, Settings;
 import 'dart:async';
+import 'dart:convert';
 import 'dart:collection';
 import 'dart:io';
 import 'dart:typed_data';
@@ -37,9 +39,9 @@ SOFTWARE.
  */
 
 /// Interface for customers of a ByteStreamReader.
-abstract class ByteStreamListener {
+abstract class StringStreamListener {
   /// Receive data from the stream.
-  Future<void> receive(Uint8List input);
+  Future<void> receive(String input);
 
   // Reset the listener because the stream ended.  The reader should prepare
   // for a (potential) new stream.
@@ -48,14 +50,14 @@ abstract class ByteStreamListener {
 
 abstract class ByteStreamReader {
   final Settings settings;
-  final ByteStreamListener listener;
+  final StringStreamListener listener;
   bool stopped = false;
-  final _events = Queue<Uint8List>();
+  final _events = Queue<String>();
   int _bytesInBuffer = 0;
   final int _bufferSize = 512;
   // https://github.com/kukulo2011/OpenCovid_ventilator/issues/18
   bool _processingQueue = false;
-  StreamSubscription<Uint8List> _subscription;
+  StreamSubscription<String> _subscription;
   Completer<void> _subscriptionDone;
   void Function() _subscriptionOnDone;
 
@@ -95,7 +97,7 @@ abstract class ByteStreamReader {
       _finishSubscription();
       return done;
     }
-    _subscription = stream.listen((Uint8List data) {
+    _subscription = Utf8Decoder().bind(stream).listen((String data) {
       _receive(data);
     }, onDone: () {
       _finishSubscription();
@@ -103,7 +105,7 @@ abstract class ByteStreamReader {
     return done;
   }
 
-  void _receive(Uint8List event) {
+  void _receive(String event) {
     _bytesInBuffer += event.length;
     _events.add(event);
     _pauseIfNeeded();
@@ -117,7 +119,7 @@ abstract class ByteStreamReader {
     try {
       while (_events.isNotEmpty) {
         final event = _events.removeFirst();
-        final eventLen = event.lengthInBytes;
+        final eventLen = event.length;
         const maxChunk = 2000;
         if (eventLen <= maxChunk) {
           if (stopped) {
@@ -135,7 +137,7 @@ abstract class ByteStreamReader {
               return;
             }
             final len = min(eventLen - i, maxChunk);
-            await listener.receive(event.sublist(i, i + len));
+            await listener.receive(event.substring(i, i + len));
             _bytesInBuffer -= len;
             _resumeIfReady();
           }
@@ -165,7 +167,7 @@ abstract class ByteStreamReader {
 class SerialReader extends ByteStreamReader {
   UsbPort _port;
 
-  SerialReader(Settings settings, ByteStreamListener listener)
+  SerialReader(Settings settings, StringStreamListener listener)
       : super(settings, listener);
 
   @override
@@ -227,8 +229,10 @@ class ServerSocketReader extends ByteStreamReader {
   List<String> _localAddresses;
 
   ServerSocketReader(
-      Settings settings, ByteStreamListener listener, this._localAddresses)
-      : super(settings, listener);
+      Settings settings, StringStreamListener listener, this._localAddresses)
+      : super(settings, listener) {
+    assert(_localAddresses != null);
+  }
 
   @override
   Future<void> start() async {
@@ -255,7 +259,7 @@ class ServerSocketReader extends ByteStreamReader {
     InternetAddress lastAddress;
     _serverSocket.listen((Socket socket) {
       if (_readingFrom != null) {
-        socket.add('Already reading data from $lastAddress\r\n'.codeUnits);
+        socket.add(utf8.encode('Already reading data from $lastAddress\r\n'));
         Log.writeln('Rejected connection from ${socket.address}');
         socket.destroy();
       } else {
@@ -300,7 +304,7 @@ class ServerSocketReader extends ByteStreamReader {
     final s = _readingFrom;
     if (s != null) {
       try {
-        s.add(msg.codeUnits);
+        s.add(utf8.encode(msg));
         return s.flush();
       } catch (ex) {
         Log.writeln('$ex sending to socket');
@@ -308,30 +312,37 @@ class ServerSocketReader extends ByteStreamReader {
     }
     return Future<void>.value(null);
   }
+
+  IOSink getSink() => _readingFrom;
 }
 
 class AssetFileReader extends ByteStreamReader {
   AssetBundle _bundle;
+  final BreezyConfiguration _config;
 
-  AssetFileReader(Settings settings, this._bundle, ByteStreamListener listener)
+  AssetFileReader(Settings settings, this._config, this._bundle,
+      StringStreamListener listener)
       : super(settings, listener);
 
   @override
   Future<void> start() async {
+    List<String> log = await _config.getSampleLog(_bundle);
     while (!stopped) {
-      ByteData d = await _bundle.load('assets/demo.log');
-      final bytes = d.buffer.asUint8List(d.offsetInBytes, d.lengthInBytes);
-      final Stream<Uint8List> stream = Stream.fromIterable([bytes]);
-      // Make a stream so that flow control works.
-      await _readStream(stream);
+      await _readStream(_makeStream(log));
       // Just keep time marching forward, while looping through the data.
       await _reset();
+    }
+  }
+
+  Stream<Uint8List> _makeStream(List<String> log) async* {
+    for (final s in log) {
+      yield Uint8List.fromList('$s\n'.codeUnits);
     }
   }
 }
 
 class BluetoothClassicReader extends ByteStreamReader {
-  BluetoothClassicReader(Settings settings, ByteStreamListener listener)
+  BluetoothClassicReader(Settings settings, StringStreamListener listener)
       : super(settings, listener);
 
   final fbs = FlutterBluetoothSerial.instance;
@@ -351,7 +362,7 @@ class BluetoothClassicReader extends ByteStreamReader {
       while (!stopped) {
         Log.writeln('Connecting to ${device.name} (${device.address})...');
         BluetoothConnection conn =
-        await BluetoothConnection.toAddress(device.address);
+            await BluetoothConnection.toAddress(device.address);
         await _readStream(conn.input, onDone: () {});
       }
     } catch (ex) {

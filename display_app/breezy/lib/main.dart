@@ -191,8 +191,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                   return [
                     PopupMenuItem<void Function()>(
                         value: () {
-                          DeviceDataSource src = _createDataSource(
-                              globals.configuration.feed, context);
+                          DeviceDataSource src = _createDataSource(context);
                           if (src != null) {
                             Navigator.push<void>(
                                 context,
@@ -270,8 +269,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                           Icon(Icons.timeline, color: Colors.black)
                         ]),
                         onPressed: () async {
-                          DeviceDataSource src = _createDataSource(
-                              globals.configuration.feed, context);
+                          DeviceDataSource src = _createDataSource(context);
                           if (src != null) {
                             unawaited(Navigator.push<void>(
                                 context,
@@ -293,25 +291,25 @@ class _BreezyHomePageState extends State<BreezyHomePage>
         ));
   }
 
-  DeviceDataSource _createDataSource(
-      config.DataFeed feed, BuildContext context) {
+  DeviceDataSource _createDataSource(BuildContext context) {
     switch (globals.settings.inputSource) {
       case InputSource.serial:
         try {
           return DeviceDataSource.fromSerial(
-              globals.settings, globals.configuration.feed);
+              globals.settings, globals.configuration);
         } catch (ex) {
           Scaffold.of(context).showSnackBar(
               SnackBar(content: Text('Error with serial port:  $ex')));
         }
         break;
-      case InputSource.assetFile:
-        return DeviceDataSource.fromAssetFile(
-            globals.settings, feed, DefaultAssetBundle.of(context));
+      case InputSource.sampleLog:
+        return DeviceDataSource.fromSampleLog(
+            globals, DefaultAssetBundle.of(context));
       case InputSource.screenDebug:
-        return DeviceDataSource.screenDebug(globals.configuration.feed);
+        return DeviceDataSource.screenDebug(globals.configuration);
       case InputSource.serverSocket:
-        return DeviceDataSource.serverSocket(globals);
+        return DeviceDataSource.serverSocket(
+            globals, DefaultAssetBundle.of(context));
       case InputSource.bluetoothClassic:
         return DeviceDataSource.bluetoothClassic(globals);
     }
@@ -327,7 +325,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
 enum InputSource {
   serial,
   screenDebug,
-  assetFile,
+  sampleLog,
   serverSocket,
   bluetoothClassic
 }
@@ -339,7 +337,7 @@ abstract class SettingsListener {
 class Settings {
   static File settingsFile;
   final listeners = List<SettingsListener>();
-  InputSource _inputSource = InputSource.assetFile;
+  InputSource _inputSource = InputSource.sampleLog;
   int _serialPortNumber = 1;
   int _baudRate = 115200;
   int _socketPort = 7777;
@@ -430,7 +428,7 @@ class Settings {
 
   bool get meterData {
     final v = _inputSource;
-    if (v == InputSource.screenDebug || v == InputSource.assetFile) {
+    if (v == InputSource.screenDebug || v == InputSource.sampleLog) {
       return true;
     } else {
       return _meterData;
@@ -481,7 +479,7 @@ class Settings {
       case InputSource.screenDebug:
         result.writeln('    Input from internal demo functions');
         break;
-      case InputSource.assetFile:
+      case InputSource.sampleLog:
         result.writeln('    Input from sample log file');
         break;
       case InputSource.serverSocket:
@@ -528,21 +526,21 @@ class UUID {
         node = (_random.nextInt(0x10000) << 8) | _random.nextInt(0x100000000);
 
   String toString() {
-    return _toHex(time_low, 8) +
+    return toHex(time_low, 8) +
         '-' +
-        _toHex(time_mid, 4) +
+        toHex(time_mid, 4) +
         '-' +
-        _toHex(time_hi_and_version, 4) +
+        toHex(time_hi_and_version, 4) +
         '-' +
-        _toHex(clock_seq_hi_and_reserved, 2) + // no dash
-        _toHex(clock_seq_low, 2) +
+        toHex(clock_seq_hi_and_reserved, 2) + // no dash
+        toHex(clock_seq_low, 2) +
         '-' +
-        _toHex(node, 12);
+        toHex(node, 12);
   }
+}
 
-  String _toHex(int value, int digits) {
-    String s = value.toRadixString(16);
-    const String zeros = '0000000000000000'; // Enough for 64 bits
-    return zeros.substring(0, digits - s.length) + s;
-  }
+String toHex(int value, int digits) {
+  String s = value.toRadixString(16);
+  const String zeros = '0000000000000000'; // Enough for 64 bits
+  return zeros.substring(0, digits - s.length) + s;
 }

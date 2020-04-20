@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show AssetBundle;
 import 'reader.dart';
-import 'dart:typed_data';
 import 'dart:async';
 import 'package:pedantic/pedantic.dart' show unawaited;
 
@@ -41,7 +40,7 @@ class InputTestPage extends StatefulWidget {
 }
 
 class _InputTestPageState extends State<InputTestPage>
-    implements Log, ByteStreamListener {
+    implements Log, StringStreamListener {
   var _text = StringBuffer();
   static const _maxTextSize = 10000; // 10 K is more than enoough text.
   ByteStreamReader reader;
@@ -62,8 +61,9 @@ class _InputTestPageState extends State<InputTestPage>
       case InputSource.screenDebug:
         reader = null;
         break;
-      case InputSource.assetFile:
-        reader = AssetFileReader(widget.globals.settings, widget.bundle, this);
+      case InputSource.sampleLog:
+        reader = AssetFileReader(widget.globals.settings,
+            widget.globals.configuration, widget.bundle, this);
         break;
       case InputSource.serverSocket:
         reader = ServerSocketReader(
@@ -149,7 +149,7 @@ class _InputTestPageState extends State<InputTestPage>
   }
 
   @override
-  Future<void> receive(Uint8List input) async {
+  Future<void> receive(String input) async {
     bytesReceived += input.length;
     if (stopped) return;
     if (pauseUntil != null && DateTime.now().isBefore(pauseUntil)) {
@@ -162,17 +162,13 @@ class _InputTestPageState extends State<InputTestPage>
       Log.writeln();
     }
     if (stopped) return;
-    final b = StringBuffer();
-    for (final ch in input) {
-      b.writeCharCode(ch);
-    }
     const waitEvery = 20000;
     if (bytesReceived - lastWait > waitEvery) {
       if (stopped) return;
       lastWait = bytesReceived;
       _waitingForBuild = Completer<void>();
     }
-    write(b.toString()); // Doesn't go to log
+    write(input); // Doesn't go to log
     if (_waitingForBuild != null) {
       await _waitingForBuild.future;
       assert(_waitingForBuild == null); // Yes, I mean that.

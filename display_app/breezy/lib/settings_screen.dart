@@ -72,8 +72,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       }
     });
     _securityStringController = TextEditingController();
-    _securityStringController.value = _securityStringController.value.copyWith(
-        text: settings.securityString);
+    _securityStringController.value =
+        _securityStringController.value.copyWith(text: settings.securityString);
   }
 
   @override
@@ -96,7 +96,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         return 'USB Serial Port';
       case InputSource.screenDebug:
         return 'Screen Debug Functions';
-      case InputSource.assetFile:
+      case InputSource.sampleLog:
         return 'Demo Log Data';
       case InputSource.serverSocket:
         return 'Socket Connection to This Device';
@@ -118,7 +118,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             InputSource.serial,
             InputSource.bluetoothClassic,
             InputSource.serverSocket,
-            InputSource.assetFile,
+            InputSource.sampleLog,
             InputSource.screenDebug
           ]
               .map((src) =>
@@ -163,7 +163,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       case InputSource.screenDebug:
         // Nothing special here
         break;
-      case InputSource.assetFile:
+      case InputSource.sampleLog:
         // Nothing special here
         break;
       case InputSource.serverSocket:
@@ -182,8 +182,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             SizedBox(width: 16),
             Expanded(
                 child: TextField(
-                    autocorrect: false,
-                    controller: _securityStringController)),
+                    autocorrect: false, controller: _securityStringController)),
           ]),
         );
         meterIsMeaningful = true;
@@ -215,16 +214,12 @@ class _SettingsScreenState extends State<SettingsScreen>
         break;
     }
     if (meterIsMeaningful) {
-      menuItems.add(Row(children: [
-        Text('Meter Incoming Data by Timestamp:  '),
-        DropdownButton<bool>(
-            value: settings.meterData,
-            onChanged: (v) => settings.meterData = v,
-            items: const [
-              DropdownMenuItem(value: true, child: Text('true')),
-              DropdownMenuItem(value: false, child: Text('false'))
-            ])
-      ]));
+      menuItems.add(CheckboxListTile(
+        title: const Text('Meter Incoming Data by Timestamp'),
+        value: settings.meterData,
+        onChanged: (v) => settings.meterData = v,
+        secondary: const Icon(Icons.access_time)
+      ));
     }
     return WillPopScope(
       onWillPop: () async {

@@ -52,15 +52,17 @@ class GraphsScreen extends StatefulWidget {
         super(key: key);
 
   @override
-  _GraphsScreenState createState() => _GraphsScreenState(_dataSource, _config.feed);
+  _GraphsScreenState createState() =>
+      _GraphsScreenState(_dataSource, _config.feed);
 }
 
 class HistoricalData {
   DeviceData _current;
   final List<WindowedData<ChartData>> _deques;
+  final void Function() advanceScreen;
 
-  HistoricalData(config.DataFeed feed) :
-    this._deques = feed.createDeques();
+  HistoricalData(config.DataFeed feed, this.advanceScreen)
+      : this._deques = feed.createDeques();
 
   DeviceData get current => _current;
 
@@ -77,19 +79,22 @@ class HistoricalData {
 class _GraphsScreenState extends State<GraphsScreen>
     implements DeviceDataListener {
   final DeviceDataSource _dataSource;
-  final HistoricalData _data;
+  HistoricalData _data;
   static final _borderColor = Colors.grey[700];
   config.Screen screen;
+  int screenNum;
   Completer<void> _waitingForBuild;
   DateTime _lastBuild = DateTime.now(); // never null
 
-  _GraphsScreenState(this._dataSource, config.DataFeed feed) :
-    this._data = HistoricalData(feed);
+  _GraphsScreenState(this._dataSource, config.DataFeed feed) {
+    _data = HistoricalData(feed, advanceScreen);
+  }
 
   @override
   void initState() {
     super.initState();
-    screen = widget._config.screens[0]; // TODO - more screens?
+    screenNum = 0;
+    screen = widget._config.screens[screenNum];
     _dataSource.start(this);
     unawaited(Screen.keepOn(true));
   }
@@ -100,6 +105,13 @@ class _GraphsScreenState extends State<GraphsScreen>
     _dataSource.stop();
     unawaited(Screen.keepOn(false));
     _notifyBuild();
+  }
+
+  void advanceScreen() {
+    setState(() {
+      screenNum = (screenNum + 1) % widget._config.screens.length;
+      screen = widget._config.screens[screenNum];
+    });
   }
 
   void _notifyBuild() {
@@ -113,6 +125,15 @@ class _GraphsScreenState extends State<GraphsScreen>
 
   @override
   Future<void> processDeviceData(DeviceData d) async {
+    if (d.newScreen != '') {
+      int sn = widget._config.getScreenNum(d.newScreen);
+      if (sn != null) {
+        screen = widget._config.screens[sn];
+        screenNum = sn;
+      } else {
+        Log.writeln('Screen "${d.newScreen}" not found');
+      }
+    }
     setState(() {
       _data.receive(d);
     });
