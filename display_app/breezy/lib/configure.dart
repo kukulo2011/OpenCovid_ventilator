@@ -492,7 +492,7 @@ class RatioValue extends FormattedValue {
 
 class Screen {
   static List<Screen> defaultScreens(DataFeed feed) {
-    final result = [_testScreen(), _defaultScreen(feed)];
+    final result = [_defaultScreen(feed)];
     for (final s in result) {
       s.init();
     }
@@ -1179,13 +1179,6 @@ DataFeed _defaultFeed() {
             ])
       ],
       dequeIndexMap: mapper.dequeIndexMap);
-}
-
-Screen _testScreen() {
-  final portrait =
-      ScreenRow(content: [ScreenSwitchArrow(color: material.Colors.yellow)]);
-  final landscape = portrait;
-  return Screen(name: 'test', portrait: portrait, landscape: landscape);
 }
 
 Screen _defaultScreen(DataFeed feed) {
