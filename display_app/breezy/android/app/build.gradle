@@ -44,7 +44,8 @@ android {
 
     defaultConfig {
         applicationId "com.jovial.breezy_display"
-        minSdkVersion 19
+        minSdkVersion 18           // Version 18 required by flutter_bluetooth_serial
+        // Version 19 required for Bluetooth LE - see https://github.com/kukulo2011/OpenCovid_ventilator/issues/14
         targetSdkVersion 28
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

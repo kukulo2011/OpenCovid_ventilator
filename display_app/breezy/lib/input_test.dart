@@ -54,6 +54,13 @@ class _InputTestPageState extends State<InputTestPage>
   void initState() {
     super.initState();
     Log.listeners.add(this);
+    unawaited(startReader());
+  }
+
+  Future<void> startReader() async {
+    if (stopped) {
+      return;
+    }
     switch (widget.globals.settings.inputSource) {
       case InputSource.serial:
         reader = SerialReader(widget.globals.settings, this);
@@ -66,8 +73,7 @@ class _InputTestPageState extends State<InputTestPage>
             widget.globals.configuration, widget.bundle, this);
         break;
       case InputSource.serverSocket:
-        reader = ServerSocketReader(
-            widget.globals.settings, this, widget.globals.deviceIPAddresses);
+        reader = ServerSocketReader(widget.globals.settings, this);
         break;
       case InputSource.bluetoothClassic:
         reader = BluetoothClassicReader(widget.globals.settings, this);
@@ -78,7 +84,7 @@ class _InputTestPageState extends State<InputTestPage>
       Log.writeln(
           "${widget.globals.settings.inputSource} doesn't produce text");
     } else {
-      unawaited(reader.start());
+      return reader.start();
     }
   }
 

@@ -135,7 +135,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
       : super(configuration);
 
   @override
-  start(DeviceDataListener listener) {
+  void start(DeviceDataListener listener) {
     super.start(listener);
     reader = createReader(settings);
     unawaited(reader.start());
@@ -296,7 +296,6 @@ class _SerialDataSource extends _ByteStreamDataSource {
 }
 
 class _ServerSocketDataSource extends _ByteStreamDataSource {
-  final List<String> localAddresses;
   final int portNumber;
   final String securityString;
   final BreezyConfiguration config;
@@ -306,8 +305,7 @@ class _ServerSocketDataSource extends _ByteStreamDataSource {
   BreezyConfigurationJsonReader configReader;
 
   _ServerSocketDataSource(BreezyGlobals globals, this.bundle)
-      : this.localAddresses = globals.deviceIPAddresses,
-        this.portNumber = globals.settings.socketPort,
+      : this.portNumber = globals.settings.socketPort,
         this.securityString = globals.settings.securityString,
         this.config = globals.configuration,
         super(globals.settings, globals.configuration,
@@ -315,7 +313,7 @@ class _ServerSocketDataSource extends _ByteStreamDataSource {
 
   @override
   ByteStreamReader createReader(Settings settings) {
-    socketReader = ServerSocketReader(settings, this, localAddresses);
+    socketReader = ServerSocketReader(settings, this);
     return socketReader;
   }
 
@@ -334,10 +332,12 @@ class _ServerSocketDataSource extends _ByteStreamDataSource {
         if (configReader.done) {
           try {
             final newConfig = configReader.getResult();
-            configReader = null;
             await socketReader.send('\n\nTODO:  Got $newConfig\n\n');
           } catch (ex) {
             await socketReader.send('\r\n\nError in new config:  $ex\r\n\n');
+            return;
+          } finally {
+            configReader = null;
           }
         }
       } else if (line == 'exit') {

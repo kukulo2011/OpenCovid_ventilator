@@ -88,43 +88,44 @@ class BreezyGlobals {
   final Settings settings = Settings();
   config.BreezyConfiguration configuration =
       config.BreezyConfiguration.defaultConfig;
-  final deviceIPAddresses = List<String>();
-  final bluetoothClassicDevices = List<BluetoothDevice>();
 
-  Future<void> checkNeighborhood() async {
-    deviceIPAddresses.clear();
+  static Future<List<String>> getDeviceIPAddresses() async {
+    final result = List<String>();
     if (NetworkInterface.listSupported) {
       // false in Android as of this writing :-(
       final List<NetworkInterface> ifs = await NetworkInterface.list();
       for (final i in ifs) {
         for (final a in i.addresses) {
-          deviceIPAddresses.add(a.toString());
+          result.add(a.toString());
         }
       }
-      if (deviceIPAddresses.isEmpty) {
-        deviceIPAddresses.add('No local IP address found');
+      if (result.isEmpty) {
+        result.add('No local IP address found');
       }
     } else {
       final conn = Connectivity();
-      final result = await conn.checkConnectivity();
-      switch (result) {
+      switch (await conn.checkConnectivity()) {
         case ConnectivityResult.wifi:
-          deviceIPAddresses.add(await conn.getWifiIP());
+          result.add(await conn.getWifiIP());
           break;
         case ConnectivityResult.mobile:
-          deviceIPAddresses.add('Moblie network, address unknown');
+          result.add('Moblie network, address unknown');
           break;
         case ConnectivityResult.none:
-          deviceIPAddresses.add('No local IP address found');
+          result.add('No local IP address found');
           break;
       }
     }
-    bluetoothClassicDevices.clear();
+    return result;
+  }
+
+  static Future<List<BluetoothDevice>> getBluetoothClassicDevices() async {
+    final result = List<BluetoothDevice>();
     try {
       List<BluetoothDevice> devices =
           await FlutterBluetoothSerial.instance.getBondedDevices();
-      bluetoothClassicDevices.addAll(devices);
-      bluetoothClassicDevices.sort((d1, d2) {
+      result.addAll(devices);
+      result.sort((d1, d2) {
         int r = 0;
         if (d1.name != null && d2.name != null) {
           // This probably never happens - I imagine the library gives
@@ -140,12 +141,14 @@ class BreezyGlobals {
     } catch (ex) {
       Log.writeln('Attempt to get bluetooth devices failed with $ex');
     }
+    return result;
   }
 }
 
 class _BreezyHomePageState extends State<BreezyHomePage>
     implements SettingsListener {
   final globals = BreezyGlobals();
+  String settingsString = '';
 
   @override
   void initState() {
@@ -154,11 +157,11 @@ class _BreezyHomePageState extends State<BreezyHomePage>
   }
 
   Future<void> asyncInit() async {
-    await globals.checkNeighborhood();
     if (Settings.settingsFile == null) {
       Directory dir = await getApplicationSupportDirectory();
       Settings.settingsFile = File("${dir.path}/settings.json");
       await globals.settings.read(globals);
+      settingsString = await globals.settings.forUI(globals);
     }
   }
 
@@ -284,7 +287,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                   ],
                 ),
                 const SizedBox(height: 50),
-                Text('${globals.settings.forUI(globals.deviceIPAddresses)}')
+                Text(settingsString)
               ],
             ),
           ),
@@ -343,7 +346,7 @@ class Settings {
   int _socketPort = 7777;
   String _securityString = UUID.random().toString();
   bool _meterData = true;
-  BluetoothDevice _bluetoothClassicDevice;
+  String _bluetoothClassicAddress;
 
   Settings();
 
@@ -379,8 +382,7 @@ class Settings {
       }
       v = json['bluetoothClassicDevice'];
       if (v != null) {
-        _bluetoothClassicDevice = globals.bluetoothClassicDevices
-            .firstWhere((d) => d.address == v, orElse: () => null);
+        _bluetoothClassicAddress = v as String;
       }
     }
   }
@@ -393,7 +395,7 @@ class Settings {
       'meterData': _meterData,
       'socketPort': _socketPort,
       'securityString': _securityString,
-      'bluetoothClassicDevice': _bluetoothClassicDevice?.address
+      'bluetoothClassicDevice': _bluetoothClassicAddress
     };
     final str = convert.json.encode(json);
     await settingsFile.writeAsString(str);
@@ -457,14 +459,19 @@ class Settings {
     _notify();
   }
 
-  BluetoothDevice get bluetoothClassicDevice => _bluetoothClassicDevice;
+  String get bluetoothClassicAddress => _bluetoothClassicAddress;
 
-  set bluetoothClassicDevice(BluetoothDevice d) {
-    _bluetoothClassicDevice = d; // null OK
+  set bluetoothClassicAddress(String d) {
+    _bluetoothClassicAddress = d; // null OK
     _notify();
   }
 
-  String forUI(List<String> localAddresses) {
+  Future<BluetoothDevice> getBluetoothClassicDevice() async =>
+      (await BreezyGlobals.getBluetoothClassicDevices()).firstWhere(
+          (d) => d.address == bluetoothClassicAddress,
+          orElse: () => null);
+
+  Future<String> forUI(BreezyGlobals globals) async {
     final result = StringBuffer();
     result.writeln("Settings:");
     result.writeln();
@@ -483,22 +490,27 @@ class Settings {
         result.writeln('    Input from sample log file');
         break;
       case InputSource.serverSocket:
-        result.writeln('    Input from socket connection');
-        result.writeln('    Connect to port:  $socketPort');
-        result.writeln('    First line of input must be "$securityString"');
-        result.writeln(
-            '        meter incoming data by time (for debug):  $meterData');
-        result.writeln(
-            '    ${localAddresses.length} available network interface(s):');
-        for (final s in localAddresses) {
-          result.writeln('        $s');
+        {
+          final localAddresses = await BreezyGlobals.getDeviceIPAddresses();
+          result.writeln('    Input from socket connection');
+          result.writeln('    Connect to port:  $socketPort');
+          result.writeln('    First line of input must be "$securityString"');
+          result.writeln(
+              '        meter incoming data by time (for debug):  $meterData');
+          result.writeln(
+              '    ${localAddresses.length} available network interface(s):');
+          for (final s in localAddresses) {
+            result.writeln('        $s');
+          }
+          break;
         }
-        break;
       case InputSource.bluetoothClassic:
-        result.writeln('    Bluetooth Classic/RFCOMM');
-        result
-            .writeln('    Device:  ${bluetoothClassicDevice?.name ?? 'none'}');
-        break;
+        {
+          BluetoothDevice d = await getBluetoothClassicDevice();
+          result.writeln('    Bluetooth Classic/RFCOMM');
+          result.writeln('    Device:  ${d?.name ?? 'none'}');
+          break;
+        }
     }
     return result.toString();
   }

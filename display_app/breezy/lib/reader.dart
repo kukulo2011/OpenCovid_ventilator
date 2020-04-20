@@ -6,7 +6,7 @@ import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
     show BluetoothConnection, FlutterBluetoothSerial;
 
 import 'configure.dart';
-import 'main.dart' show Log, Settings;
+import 'main.dart' show Log, Settings, BreezyGlobals;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:collection';
@@ -226,23 +226,21 @@ class SerialReader extends ByteStreamReader {
 class ServerSocketReader extends ByteStreamReader {
   ServerSocket _serverSocket;
   Socket _readingFrom;
-  List<String> _localAddresses;
 
   ServerSocketReader(
-      Settings settings, StringStreamListener listener, this._localAddresses)
-      : super(settings, listener) {
-    assert(_localAddresses != null);
-  }
+      Settings settings, StringStreamListener listener)
+      : super(settings, listener);
 
   @override
   Future<void> start() async {
+    final localAddresses = await BreezyGlobals.getDeviceIPAddresses();
     if (stopped) {
       return;
     }
     Log.writeln('Listening to port ${settings.socketPort}');
     Log.writeln(
-        '    ${_localAddresses.length} available network interface(s):');
-    for (final s in _localAddresses) {
+        '    ${localAddresses.length} available network interface(s):');
+    for (final s in localAddresses) {
       Log.writeln('        $s');
     }
     _serverSocket =
@@ -352,7 +350,7 @@ class BluetoothClassicReader extends ByteStreamReader {
     if (stopped) {
       return;
     }
-    final device = settings.bluetoothClassicDevice;
+    final device = await settings.getBluetoothClassicDevice();
     if (device == null) {
       Log.writeln('No Bluetooth Classic device selected.');
       Log.writeln('Please select one in Settings.');

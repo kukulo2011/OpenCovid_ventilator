@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pedantic/pedantic.dart';
 import 'main.dart'
     show Settings, SettingsListener, InputSource, UUID, BreezyGlobals;
 import 'package:usb_serial/usb_serial.dart' show UsbSerial, UsbDevice;
@@ -33,16 +34,13 @@ class SettingsScreen extends StatefulWidget {
   final Settings _settings;
   final BreezyGlobals globals;
   final List<UsbDevice> usbDevices = List<UsbDevice>();
-  final List<BluetoothDevice> bluetoothClassicDevices;
 
   SettingsScreen(this.globals)
-      : this._settings = globals.settings,
-        this.bluetoothClassicDevices = globals.bluetoothClassicDevices;
+      : this._settings = globals.settings;
 
   Future<void> init() async {
     usbDevices.clear();
     usbDevices.addAll(await UsbSerial.listDevices());
-    await globals.checkNeighborhood();
   }
 
   @override
@@ -52,6 +50,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen>
     implements SettingsListener {
   final Settings settings;
+  List<BluetoothDevice> _bluetoothClassicDevices = null;
   TextEditingController _socketPortController;
   TextEditingController _securityStringController;
 
@@ -74,6 +73,19 @@ class _SettingsScreenState extends State<SettingsScreen>
     _securityStringController = TextEditingController();
     _securityStringController.value =
         _securityStringController.value.copyWith(text: settings.securityString);
+  }
+
+  Future<void> initBluetooth() async {
+    if (settings.inputSource != InputSource.bluetoothClassic) {
+      _bluetoothClassicDevices = null;
+    } else if (_bluetoothClassicDevices == null) {
+      final d = await BreezyGlobals.getBluetoothClassicDevices();
+      if (settings.inputSource == InputSource.bluetoothClassic) {
+        setState(() {
+          _bluetoothClassicDevices = d;
+        });
+      }
+    }
   }
 
   @override
@@ -189,24 +201,31 @@ class _SettingsScreenState extends State<SettingsScreen>
         break;
       case InputSource.bluetoothClassic:
         {
-          final items = widget.bluetoothClassicDevices
-              .map((d) => DropdownMenuItem(
-                  value: d, child: Text('${d.name}  ${d.address}')))
-              .toList(growable: true);
-          if (items.isEmpty) {
-            items.add(DropdownMenuItem<BluetoothDevice>(
-                value: null, child: Text('No paired devices found.')));
+          final items = List<DropdownMenuItem<String>>();
+          if (_bluetoothClassicDevices == null) {
+            unawaited(initBluetooth());
+            items.add(DropdownMenuItem<String>(
+              value: null, child: Text('Looking for paired devices...')));
           } else {
-            items.insert(
+            items.addAll(_bluetoothClassicDevices
+              .map((d) =>
+              DropdownMenuItem(
+                value: d.address, child: Text('${d.name}  ${d.address}'))));
+            if (items.isEmpty) {
+              items.add(DropdownMenuItem<String>(
+                value: null, child: Text('No paired devices found.')));
+            } else {
+              items.insert(
                 0,
-                DropdownMenuItem<BluetoothDevice>(
-                    value: null, child: Text('none')));
+                DropdownMenuItem<String>(
+                  value: null, child: Text('none')));
+            }
           }
           menuItems.add(Row(children: [
             Text('Device:  '),
-            DropdownButton<BluetoothDevice>(
-                value: settings.bluetoothClassicDevice,
-                onChanged: (v) => settings.bluetoothClassicDevice = v,
+            DropdownButton<String>(
+                value: settings.bluetoothClassicAddress,
+                onChanged: (v) => settings.bluetoothClassicAddress = v,
                 items: items)
           ]));
         }
