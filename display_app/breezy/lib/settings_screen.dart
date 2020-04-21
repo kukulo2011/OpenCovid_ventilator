@@ -148,11 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             onPressed: settings.configurationName == null
                 ? null
                 : () {
-                    setState(() {
-                      BreezyConfiguration.delete(settings.configurationName);
-                      _readConfigurations();
-                      settings.configurationName = null;
-                    });
+                    unawaited(_deletePressed(context));
                   })
       ]));
     }
@@ -289,6 +285,37 @@ class _SettingsScreenState extends State<SettingsScreen>
                   children: menuItems))),
     );
   }
+
+  Future<void> _deletePressed(BuildContext context) => showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          // return object of type Dialog
+          return AlertDialog(
+            title: Text('Delete configuration?'),
+            content: Text('This will delete the configuration '),
+            actions: <Widget>[
+              // usually buttons at the bottom of the dialog
+              FlatButton(
+                child: Text('Cancel'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+              FlatButton(
+                child: Text('Delete'),
+                onPressed: () {
+                  setState(() {
+                    BreezyConfiguration.delete(settings.configurationName);
+                    _readConfigurations();
+                    settings.configurationName = null;
+                  });
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      );
 
   @override
   void settingsChanged() {
