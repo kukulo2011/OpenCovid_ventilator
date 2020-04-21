@@ -26,7 +26,7 @@ SOFTWARE.
 
 abstract class TimedData {
   /// Time in milliseconds
-  double get timeMS;
+  double get timeS;
 }
 
 abstract class WindowedData<T> {
@@ -58,6 +58,7 @@ class RollingDeque<T extends TimedData> implements WindowedData<T> {
   int _firstIndex = 0;
   int _minElementIndex = 0; // Index into RollingDeque, not _list.
   List<T> _window;
+  static const double fudge = 0.999999999;
 
   RollingDeque(
       int maxElements, this.windowSize, this._gapSize, this._dummyFactory)
@@ -69,9 +70,9 @@ class RollingDeque<T extends TimedData> implements WindowedData<T> {
   @override
   void append(T e) {
     _window = null; // Invalidate cached value
-    assert(length == 1 || this[length - 2].timeMS < e.timeMS);
-    double earliestValid = e.timeMS - (windowSize - _gapSize);
-    while (length > 1 && this[0].timeMS < earliestValid) {
+    assert(length == 1 || this[length - 2].timeS < e.timeS);
+    double earliestValid = e.timeS - (windowSize*fudge - _gapSize);
+    while (length > 1 && this[0].timeS < earliestValid) {
       _list[_firstIndex++] = null;
       _firstIndex %= _list.length;
       length--;
@@ -81,16 +82,16 @@ class RollingDeque<T extends TimedData> implements WindowedData<T> {
     }
     _list[(_firstIndex + length - 1) % _list.length] = e; // old dummy
     assert(identical(last, e));
-    if (this[_minElementIndex].timeMS.remainder(windowSize) >
-        e.timeMS.remainder(windowSize)) {
+    if (this[_minElementIndex].timeS.remainder(windowSize) >
+        e.timeS.remainder(windowSize)) {
       _minElementIndex = length - 1;
     }
     assert(length < _list.length);
-    T dummy = _dummyFactory(e.timeMS + _gapSize / 2.0);
+    T dummy = _dummyFactory(e.timeS + _gapSize / 2.0);
     _list[(_firstIndex + length++) % _list.length] = dummy;
     assert(identical(last, dummy));
-    if (this[_minElementIndex].timeMS.remainder(windowSize) >
-        dummy.timeMS.remainder(windowSize)) {
+    if (this[_minElementIndex].timeS.remainder(windowSize) >
+        dummy.timeS.remainder(windowSize)) {
       _minElementIndex = length - 1;
     }
   }
@@ -167,6 +168,9 @@ class SlidingDeque<T extends TimedData> implements WindowedData<T> {
   int length = 0;
   int _firstIndex = 0;
   List<T> _window;
+  static const double fudge = 0.999999999;
+  // Make sure rounding errors don't cause a remainder call to take the
+  // latest valid time in the window down to the beginning.
 
   SlidingDeque(int maxElements, this.windowSize)
       : this._list = List<T>(maxElements);
@@ -175,9 +179,9 @@ class SlidingDeque<T extends TimedData> implements WindowedData<T> {
   @override
   void append(T e) {
     _window = null; // Invalidate cached value
-    assert(length == 0 || this[length - 1].timeMS < e.timeMS);
-    double tooEarly = e.timeMS - windowSize;
-    while (length > 0 && this[0].timeMS <= tooEarly) {
+    assert(length == 0 || this[length - 1].timeS < e.timeS);
+    double tooEarly = e.timeS - windowSize*fudge;
+    while (length > 0 && this[0].timeS <= tooEarly) {
       _list[_firstIndex++] = null;
       _firstIndex %= _list.length;
       length--;
@@ -204,7 +208,7 @@ class SlidingDeque<T extends TimedData> implements WindowedData<T> {
   }
 
   @override
-  double get timeOffset => (length == 0) ? 0.0 : first.timeMS;
+  double get timeOffset => (length == 0) ? 0.0 : first.timeS;
 }
 
 class _SlidingDequeWindowIterable<T extends TimedData> extends IterableBase<T> {

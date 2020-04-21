@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pedantic/pedantic.dart';
+import 'configure.dart' show BreezyConfiguration;
 import 'main.dart'
     show Settings, SettingsListener, InputSource, UUID, BreezyGlobals;
 import 'package:usb_serial/usb_serial.dart' show UsbSerial, UsbDevice;
@@ -35,8 +36,7 @@ class SettingsScreen extends StatefulWidget {
   final BreezyGlobals globals;
   final List<UsbDevice> usbDevices = List<UsbDevice>();
 
-  SettingsScreen(this.globals)
-      : this._settings = globals.settings;
+  SettingsScreen(this.globals) : this._settings = globals.settings;
 
   Future<void> init() async {
     usbDevices.clear();
@@ -50,7 +50,8 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen>
     implements SettingsListener {
   final Settings settings;
-  List<BluetoothDevice> _bluetoothClassicDevices = null;
+  List<BluetoothDevice> _bluetoothClassicDevices;
+  List<String> _configurations;
   TextEditingController _socketPortController;
   TextEditingController _securityStringController;
 
@@ -60,6 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   void initState() {
     super.initState();
     settings.listeners.add(this);
+    _readConfigurations();
     _socketPortController = TextEditingController();
     _socketPortController.text = settings.socketPort.toString();
     _socketPortController.addListener(() {
@@ -73,6 +75,10 @@ class _SettingsScreenState extends State<SettingsScreen>
     _securityStringController = TextEditingController();
     _securityStringController.value =
         _securityStringController.value.copyWith(text: settings.securityString);
+  }
+
+  void _readConfigurations() {
+    _configurations = BreezyConfiguration.getStoredConfigurations();
   }
 
   Future<void> initBluetooth() async {
@@ -122,6 +128,34 @@ class _SettingsScreenState extends State<SettingsScreen>
   Widget build(BuildContext context) {
     bool meterIsMeaningful = false;
     final menuItems = List<Widget>();
+    if (_configurations.isNotEmpty) {
+      final items = List<DropdownMenuItem<String>>();
+      items.add(DropdownMenuItem(value: null, child: Text('- default -')));
+      for (final c in _configurations) {
+        items.add(DropdownMenuItem(value: c, child: Text(c)));
+      }
+      menuItems.add(Row(children: [
+        Text('Configuration:  '),
+        DropdownButton<String>(
+            value: settings.configurationName,
+            items: items,
+            onChanged: (s) {
+              settings.configurationName = s;
+            }),
+        SizedBox(width: 20),
+        IconButton(
+            icon: Icon(Icons.delete),
+            onPressed: settings.configurationName == null
+                ? null
+                : () {
+                    setState(() {
+                      BreezyConfiguration.delete(settings.configurationName);
+                      _readConfigurations();
+                      settings.configurationName = null;
+                    });
+                  })
+      ]));
+    }
     menuItems.add(Row(children: [
       Text('Input:  '),
       DropdownButton<InputSource>(
@@ -205,20 +239,16 @@ class _SettingsScreenState extends State<SettingsScreen>
           if (_bluetoothClassicDevices == null) {
             unawaited(initBluetooth());
             items.add(DropdownMenuItem<String>(
-              value: null, child: Text('Looking for paired devices...')));
+                value: null, child: Text('Looking for paired devices...')));
           } else {
-            items.addAll(_bluetoothClassicDevices
-              .map((d) =>
-              DropdownMenuItem(
+            items.addAll(_bluetoothClassicDevices.map((d) => DropdownMenuItem(
                 value: d.address, child: Text('${d.name}  ${d.address}'))));
             if (items.isEmpty) {
               items.add(DropdownMenuItem<String>(
-                value: null, child: Text('No paired devices found.')));
+                  value: null, child: Text('No paired devices found.')));
             } else {
-              items.insert(
-                0,
-                DropdownMenuItem<String>(
-                  value: null, child: Text('none')));
+              items.insert(0,
+                  DropdownMenuItem<String>(value: null, child: Text('none')));
             }
           }
           menuItems.add(Row(children: [
@@ -234,15 +264,20 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
     if (meterIsMeaningful) {
       menuItems.add(CheckboxListTile(
-        title: const Text('Meter Incoming Data by Timestamp'),
-        value: settings.meterData,
-        onChanged: (v) => settings.meterData = v,
-        secondary: const Icon(Icons.access_time)
-      ));
+          title: const Text('Meter Incoming Data by Timestamp'),
+          value: settings.meterData,
+          onChanged: (v) => settings.meterData = v,
+          secondary: const Icon(Icons.access_time)));
     }
     return WillPopScope(
       onWillPop: () async {
         await settings.write();
+        final cn = settings.configurationName;
+        if (cn != null) {
+          widget.globals.configuration = await BreezyConfiguration.read(cn);
+        } else {
+          widget.globals.configuration = BreezyConfiguration.defaultConfig;
+        }
         return true;
       },
       child: Scaffold(

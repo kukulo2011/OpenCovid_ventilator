@@ -5,7 +5,7 @@ import 'dart:async';
 import 'configure.dart' as config;
 import 'deques.dart';
 import 'read_device.dart';
-import 'main.dart' show Log;
+import 'main.dart' show Log, BreezyGlobals;
 
 /*
 MIT License
@@ -41,19 +41,19 @@ SOFTWARE.
 ///
 class GraphsScreen extends StatefulWidget {
   final DeviceDataSource _dataSource;
-  final config.BreezyConfiguration _config;
+  final BreezyGlobals _globals;
 
   GraphsScreen(
       {Key key,
       @required DeviceDataSource dataSource,
-      @required config.BreezyConfiguration config})
+      @required BreezyGlobals globals})
       : this._dataSource = dataSource,
-        this._config = config,
+        this._globals = globals,
         super(key: key);
 
   @override
   _GraphsScreenState createState() =>
-      _GraphsScreenState(_dataSource, _config.feed);
+      _GraphsScreenState(_dataSource, _globals);
 }
 
 class HistoricalData {
@@ -79,6 +79,7 @@ class HistoricalData {
 class _GraphsScreenState extends State<GraphsScreen>
     implements DeviceDataListener {
   final DeviceDataSource _dataSource;
+  final BreezyGlobals globals;
   HistoricalData _data;
   static final _borderColor = Colors.grey[700];
   config.Screen screen;
@@ -86,15 +87,15 @@ class _GraphsScreenState extends State<GraphsScreen>
   Completer<void> _waitingForBuild;
   DateTime _lastBuild = DateTime.now(); // never null
 
-  _GraphsScreenState(this._dataSource, config.DataFeed feed) {
-    _data = HistoricalData(feed, advanceScreen);
+  _GraphsScreenState(this._dataSource, this.globals) {
+    _data = HistoricalData(globals.configuration.feed, advanceScreen);
   }
 
   @override
   void initState() {
     super.initState();
     screenNum = 0;
-    screen = widget._config.screens[screenNum];
+    screen = globals.configuration.screens[screenNum];
     _dataSource.start(this);
     unawaited(Screen.keepOn(true));
   }
@@ -109,8 +110,8 @@ class _GraphsScreenState extends State<GraphsScreen>
 
   void advanceScreen() {
     setState(() {
-      screenNum = (screenNum + 1) % widget._config.screens.length;
-      screen = widget._config.screens[screenNum];
+      screenNum = (screenNum + 1) % globals.configuration.screens.length;
+      screen = globals.configuration.screens[screenNum];
     });
   }
 
@@ -126,9 +127,9 @@ class _GraphsScreenState extends State<GraphsScreen>
   @override
   Future<void> processDeviceData(DeviceData d) async {
     if (d.newScreen != '') {
-      int sn = widget._config.getScreenNum(d.newScreen);
+      int sn = globals.configuration.getScreenNum(d.newScreen);
       if (sn != null) {
-        screen = widget._config.screens[sn];
+        screen = globals.configuration.screens[sn];
         screenNum = sn;
       } else {
         Log.writeln('Screen "${d.newScreen}" not found');
@@ -196,5 +197,15 @@ class _GraphsScreenState extends State<GraphsScreen>
             orientation == Orientation.portrait
                 ? screen.portrait.build(_data)
                 : screen.landscape.build(_data));
+  }
+
+  @override
+  Future<void> processNewConfiguration(config.BreezyConfiguration newConfig) async {
+    // TODO:  Save to filesystem
+    await newConfig.save();
+    globals.configuration = newConfig;
+    globals.settings.configurationName = newConfig.name;
+    await globals.settings.write();
+    Navigator.of(context).pop();
   }
 }

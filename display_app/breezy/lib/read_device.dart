@@ -43,9 +43,9 @@ class DeviceData {
   final ChartData chart;
   final String newScreen;
 
-  DeviceData(double timeMS, List<double> chartedValues, this.displayedValues,
+  DeviceData(double timeS, List<double> chartedValues, this.displayedValues,
       this.newScreen)
-      : chart = ChartData(timeMS, chartedValues) {
+      : chart = ChartData(timeS, chartedValues) {
     assert(displayedValues != null);
     assert(newScreen != null);
   }
@@ -54,18 +54,19 @@ class DeviceData {
 class ChartData extends TimedData {
   final List<double> values;
   @override
-  final double timeMS;
+  final double timeS; // Time in seconds
 
-  ChartData(this.timeMS, this.values) {
-    assert(timeMS != null);
+  ChartData(this.timeS, this.values) {
+    assert(timeS != null);
     assert(values != null);
   }
 
-  ChartData.dummy(this.timeMS) : values = null;
+  ChartData.dummy(this.timeS) : values = null;
 }
 
 abstract class DeviceDataListener {
   Future<void> processDeviceData(DeviceData d);
+  Future<void> processNewConfiguration(BreezyConfiguration c);
 }
 
 abstract class DeviceDataSource {
@@ -121,18 +122,23 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
   final int _cr = '\r'.codeUnitAt(0);
   static final int _newline = '\n'.codeUnitAt(0);
   static final int _hash = '#'.codeUnitAt(0);
-  static const _resetTimeGap = 40; // ms
+  final int _resetTimeGap; // In ticks
   Settings settings;
   ByteStreamReader reader;
+  BreezyConfigurationJsonReader configReader;
   final bool _meterData;
   final _lineBuffer = StringBuffer();
   int _lastTime; // Last time seen in file.  Starts out null
-  int _currTime = -_resetTimeGap; // 64 bits
+  int _currTime; // 64 bits, in ticks
   DateTime _startTime;
 
   _ByteStreamDataSource(
       this.settings, config.BreezyConfiguration configuration, this._meterData)
-      : super(configuration);
+      : this._resetTimeGap = // About 40ms:
+            max(1, (((40 / 1000) * configuration.feed.ticksPerSecond).round())),
+        super(configuration) {
+    _currTime = -_resetTimeGap;
+  }
 
   @override
   void start(DeviceDataListener listener) {
@@ -143,30 +149,15 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
 
   ByteStreamReader createReader(Settings settings);
 
-  @override
-  @mustCallSuper
-
   /// Reset for a new connection from a source that supports multiple
   /// connections, like a server socket.
+  @mustCallSuper
   Future<void> reset() {
     return _resetTime();
   }
 
   Future<void> _resetTime() async {
     _lastTime = null;
-    /*  If we want a gap when there's a reset-time:
-    final charted = List<double>(3);  // full of nulls
-    final displayed = List<String>(11);
-    for (int i = 0; i < displayed.length; i++) {
-      displayed[i] = '';
-    }
-    final l = _listener;
-    if (l != null) {
-      final t = _currTime + _resetTimeGap ~/ 2;
-      return l.processDeviceData(
-        DeviceData(t / 1000.0, charted, displayed));
-    }
-     */
   }
 
   @override
@@ -190,13 +181,41 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
   }
 
   Future<void> receiveLine(String line) async {
-    if (line.isEmpty || line.codeUnitAt(0) == _hash) {
+    if (configReader != null) {
+      configReader.acceptLine(line);
+      if (configReader.done) {
+        try {
+          final newConfig = configReader.getResult();
+          await _listener.processNewConfiguration(newConfig);
+        } catch (ex, st) {
+          await send('\r\n\nStack trace:  $st\r\n\n');
+          await send('Error in new config:  $ex\r\n\n');
+        } finally {
+          configReader = null;
+        }
+      }
+      return;
+    } else if (line.isEmpty || line.codeUnitAt(0) == _hash) {
       await Future.delayed(Duration(microseconds: 250), () => null);
       // Just a bit of robustness if we get flooded by comments
+      return;
+    } else if ('read-config' == line) {
+      configReader = BreezyConfigurationJsonReader(compact: false);
+      return;
+    } else if (line.startsWith('read-config-compact:')) {
+      try {
+        int checksum = int.parse(line.substring(20), radix: 16);
+        // The Linux crc32 command uses hex, so I did too.
+        configReader =
+            BreezyConfigurationJsonReader(compact: false, checksum: checksum);
+      } catch (ex) {
+        await send('Error in command:  $ex\r\n');
+      }
       return;
     } else if ('reset-time' == line) {
       return _resetTime();
     }
+
     List<String> parts = line.split(',');
     try {
       int pos = 0;
@@ -251,7 +270,8 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
           _currTime += deltaT;
           if (_meterData) {
             int now = DateTime.now().difference(_startTime).inMilliseconds;
-            int dNow = _currTime - now;
+            int dNow =
+                (_currTime * (1000 / feedSpec.ticksPerSecond)).round() - now;
             if (dNow > 0) {
               await Future.delayed(Duration(milliseconds: dNow), () => null);
             }
@@ -261,13 +281,22 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
 
         final l = _listener;
         if (l != null) {
-          await l.processDeviceData(
-              DeviceData(_currTime / 1000.0, charted, displayed, newScreen));
+          await l.processDeviceData(DeviceData(
+              _currTime / feedSpec.ticksPerSecond,
+              charted,
+              displayed,
+              newScreen));
         }
       }
     } catch (ex) {
       Log.writeln('$ex for "$line"');
     }
+  }
+
+  /// Send an informative message to our source, if that source is
+  /// capable and interested.
+  Future<void> send(String message) {
+    return Future.value(null);
   }
 }
 
@@ -302,7 +331,6 @@ class _ServerSocketDataSource extends _ByteStreamDataSource {
   final AssetBundle bundle;
   bool firstLineMatched = false;
   ServerSocketReader socketReader;
-  BreezyConfigurationJsonReader configReader;
 
   _ServerSocketDataSource(BreezyGlobals globals, this.bundle)
       : this.portNumber = globals.settings.socketPort,
@@ -325,54 +353,47 @@ class _ServerSocketDataSource extends _ByteStreamDataSource {
   }
 
   @override
+  Future<void> send(String message) => socketReader?.send(message);
+
+  @override
   Future<void> receiveLine(String line) async {
     if (firstLineMatched) {
-      if (configReader != null) {
-        configReader.acceptLine(line);
-        if (configReader.done) {
-          try {
-            final newConfig = configReader.getResult();
-            await socketReader.send('\n\nTODO:  Got $newConfig\n\n');
-          } catch (ex) {
-            await socketReader.send('\r\n\nError in new config:  $ex\r\n\n');
-            return;
-          } finally {
-            configReader = null;
-          }
-        }
-      } else if (line == 'exit') {
-        await socketReader.send('Goodbye.\r\n');
+      if (line == 'exit') {
+        await send('Goodbye.\r\n');
         socketReader.closeThisSocket();
         return;
       } else if (line == 'write-config') {
-        await socketReader.send('\r\n');
+        await send('\r\n');
         await config.writeJson(socketReader.getSink(), bundle);
-        await socketReader.send('\r\n');
+        await send('\r\n');
       } else if (line == 'write-config-compact') {
-        await socketReader.send('\r\n');
+        await send('\r\n');
         await config.writeCompact(socketReader.getSink(), bundle);
-        await socketReader.send('\r\n');
-      } else if (line == 'read-config') {
-        configReader = BreezyConfigurationJsonReader(compact: false);
-      } else if (line.startsWith('read-config-compact:')) {
-        try {
-          int checksum = int.parse(line.substring(20), radix: 16);
-          // The Linux crc32 command uses hex, so I did too.
-          configReader =
-              BreezyConfigurationJsonReader(compact: false, checksum: checksum);
-        } catch (ex) {
-          await socketReader.send('Error in command:  $ex\r\n');
-        }
+        await send('\r\n');
+      } else if (line == 'help') {
+        await send('\r\n');
+        await send('exit to close socket.\r\n');
+        await send('reset-time when starting data on a loop.\r\n');
+        await send('write-config to write current configuration.\r\n');
+        await send('write-config-compact for gzipped version.\r\n');
+        await send('read-config to read a new configuration in JSON.\r\n');
+        await send('    Terminated by blank line.\r\n');
+        await send(
+            'read-config-compact:<checksum> for the compact version.\r\n');
+        await send(
+            '    Takes a base64-encoded gzipped JSON configuration, terminated by blank line.\r\n');
+        await send(
+            '    checksum is crc32 checksum of gzipped config file, in hex\r\n');
+        await send('help for this message\r\n');
+        await send('\r\n');
       } else {
         return super.receiveLine(line);
       }
     } else if (line == securityString) {
-      await socketReader.send(
-          'Security string matched.\r\n"exit" will close socket.\r\n' +
-              '"write-config" will write current configuration to socket.\r\n');
+      await send('Security string matched.\r\n"help" for command list.\r\n');
       firstLineMatched = true;
     } else {
-      await socketReader.send('Bad security string.\r\n');
+      await send('Bad security string.\r\n');
       await Future.delayed(Duration(seconds: 5), () => null);
     }
   }

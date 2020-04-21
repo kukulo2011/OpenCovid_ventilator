@@ -76,7 +76,9 @@ class TimeChart<D extends TimedData> extends StatelessWidget {
   Widget build(BuildContext context) {
     final tickSpecs = List<charts.TickSpec<double>>(_numTicks);
     for (int i = 0; i < _numTicks; i++) {
-      tickSpecs[i] = charts.TickSpec(i.toDouble(), label: '');
+      tickSpecs[i] = charts.TickSpec(
+          i.toDouble() * _data.windowSize / (_numTicks - 1),
+          label: '');
     }
     final int labelSpaceFlex =
         max(1, min(30, (100 * _labelHeightFactor / 1.4).round()));
@@ -125,7 +127,7 @@ class TimeChart<D extends TimedData> extends StatelessWidget {
                             }
                           },
                           domainFn: (d, _) =>
-                              (d.timeMS - timeOffset).remainder(windowSize),
+                            (d.timeS - timeOffset).remainder(windowSize),
                           measureFn: (d, _) {
                             final v = _selector.getValue(d);
                             if (v == null) {

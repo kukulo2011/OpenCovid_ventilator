@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' show min;
-import 'dart:io' show IOSink, gzip;
+import 'dart:io' show File, Directory, FileSystemEntity, IOSink, gzip;
+import 'package:path/path.dart' as path;
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' as material;
@@ -45,6 +46,7 @@ SOFTWARE.
 //        https://stackoverflow.com/questions/4799576/register-a-new-file-type-in-android#4838863
 
 abstract class BreezyConfiguration {
+  static Directory localStorage;
   final DataFeed feed;
   final String name;
   final List<Screen> screens;
@@ -53,7 +55,6 @@ abstract class BreezyConfiguration {
 
   BreezyConfiguration(
       {@required this.name, @required this.feed, @required this.screens}) {
-    assert(name != null);
     assert(feed != null);
     assert(screens != null);
   }
@@ -64,7 +65,7 @@ abstract class BreezyConfiguration {
     final feed = _defaultFeed();
     final screens = Screen.defaultScreens(feed);
     return _DefaultBreezyConfiguration(
-        name: 'default', screens: screens, feed: feed);
+        name: null, screens: screens, feed: feed);
   }
 
   int getScreenNum(String name) {
@@ -125,10 +126,47 @@ abstract class BreezyConfiguration {
       sink.writeln(str.substring(i, end));
     }
   }
+
+  Future<void> save() async {
+    final dir = await localStorage.create(recursive: true);
+    final f = File('${dir.path}/$name');
+    if (!await FileSystemEntity.identical(dir.path, f.parent.path)) {
+      throw Exception('Illegal file name in $name');
+    }
+    String str = JsonEncoder().convert(await toJson(null));
+    // Bundle is null in toJson, because there's no reason to ever
+    // write the default configuration to the filesystem.
+    List<int> bytes = utf8.encode(str);
+    str = null;
+    bytes = gzip.encoder.convert(bytes);
+    await f.writeAsBytes(bytes);
+  }
+
+  static Future<BreezyConfiguration> read(String name) async {
+    final f = File('${localStorage.path}/$name');
+    if (!await f.exists()) {
+      throw Exception('$f not found');
+    }
+    List<int> bytes = await f.readAsBytes();
+    bytes = gzip.decode(bytes);
+    String src = utf8.decode(bytes);
+    bytes = null;
+    final json = jsonDecode(src) as Map<Object, Object>;
+    src = null;
+    return BreezyConfiguration.fromJson(json);
+  }
+
+  static List<String> getStoredConfigurations() => localStorage
+      .listSync()
+      .map((FileSystemEntity f) => path.basename(f.path))
+      .toList(growable: false)
+        ..sort((s1, s2) => s1.toLowerCase().compareTo(s2.toLowerCase()));
+
+  static void delete(String name) =>
+    File('${localStorage.path}/$name').deleteSync();
 }
 
 class BreezyConfigurationJsonReader {
-
   bool get done => _done;
   bool _done = false;
   final _source = StringBuffer();
@@ -259,6 +297,7 @@ class DataFeed {
   final String protocolName;
   final int protocolVersion;
   final int timeModulus;
+  final double ticksPerSecond;
   final List<Value> chartedValues;
   final List<Value> displayedValues;
   final Map<_DequeSelector, int> dequeIndexMap;
@@ -270,6 +309,7 @@ class DataFeed {
       {@required this.protocolName,
       @required this.protocolVersion,
       @required this.timeModulus,
+      @required this.ticksPerSecond,
       @required this.chartedValues,
       @required this.displayedValues,
       @required this.dequeIndexMap,
@@ -292,8 +332,9 @@ class DataFeed {
       'protocolName': protocolName,
       'protocolVersion': protocolVersion,
       'timeModulus': timeModulus,
+      'ticksPerSecond': ticksPerSecond,
       'values': values,
-      'screenSwtichCommand': screenSwitchCommand,
+      'screenSwitchCommand': screenSwitchCommand,
       'checksumIsOptional': checksumIsOptional
     };
   }
@@ -324,6 +365,7 @@ class DataFeed {
         protocolName: json['protocolName'] as String,
         protocolVersion: json['protocolVersion'] as int,
         timeModulus: json['timeModulus'] as int,
+        ticksPerSecond: (json['ticksPerSecond'] as num).toDouble(),
         chartedValues: chartedValues,
         displayedValues: displayedValues,
         dequeIndexMap: json.dequeIndexMapper.dequeIndexMap,
@@ -379,8 +421,8 @@ class Value {
   static Value _fromJson(
       _JsonHelper json, _ValueIndex valueIndex, int feedIndex) {
     final type = json['type'] as String;
-    final demoMinValue = json['demoMinValue'] as double;
-    final demoMaxValue = json['demoMaxValue'] as double;
+    final demoMinValue = (json['demoMinValue'] as num).toDouble();
+    final demoMaxValue = (json['demoMaxValue'] as num).toDouble();
     final displayers = List<DataDisplayer>((json['displayers'] as List).length);
     Value v;
     switch (type) {
@@ -393,7 +435,7 @@ class Value {
         break;
       case 'FormattedValue':
         v = FormattedValue(
-            format: json['demoFormat'] as String,
+            format: json['format'] as String,
             keepOriginalFormat: json['keepOriginalFormat'] as bool,
             demoMinValue: demoMinValue,
             demoMaxValue: demoMaxValue,
@@ -402,7 +444,7 @@ class Value {
         break;
       case 'RatioValue':
         v = RatioValue(
-            format: json['demoFormat'] as String,
+            format: json['format'] as String,
             keepOriginalFormat: json['keepOriginalFormat'] as bool,
             demoMinValue: demoMinValue,
             demoMaxValue: demoMaxValue,
@@ -416,8 +458,11 @@ class Value {
       return DataDisplayer._fromJson(json, v, valueIndex);
     }
 
-    v.displayers.replaceRange(
-        0, v.displayers.length, json.decodeList('displayers', makeDisplayer));
+    final nd = json.decodeList('displayers', makeDisplayer);
+    assert(nd.length == displayers.length);
+    for (int i = 0; i < nd.length; i++) {
+      v.displayers[i] = nd[i];
+    }
     return v;
   }
 }
@@ -633,7 +678,7 @@ class ValueBox extends DataDisplayer {
         id: json['id'] as String,
         valueIndex: index,
         label: json['label'] as String,
-        labelHeightFactor: json['labelHeightFactor'] as double,
+        labelHeightFactor: (json['labelHeightFactor'] as num).toDouble(),
         units: json.getOrNull('units') as String,
         format: json['format'] as String,
         color: json.getColor('color'),
@@ -711,14 +756,14 @@ class TimeChart extends DataDisplayer
     final tc = TimeChart(
         id: json['id'] as String,
         rolling: json['rolling'] as bool,
-        minValue: json['minValue'] as double,
-        maxValue: json['maxValue'] as double,
-        timeSpan: json['timeSpan'] as double,
+        minValue: (json['minValue'] as num).toDouble(),
+        maxValue: (json['maxValue'] as num).toDouble(),
+        timeSpan: (json['timeSpan'] as num).toDouble(),
         maxNumValues: json['maxNumValues'] as int,
         displayedTimeTicks: json['displayedTimeTicks'] as int,
         color: charts.Color.fromHex(code: json['color'] as String),
         label: json['label'] as String,
-        labelHeightFactor: json['labelHeightFactor'] as double,
+        labelHeightFactor: (json['labelHeightFactor'] as num).toDouble(),
         valueIndex: index,
         mapper: json.dequeIndexMapper);
     json.registerDisplayer(tc);
@@ -927,6 +972,7 @@ DataFeed _defaultFeed() {
       protocolName: 'breezy',
       protocolVersion: 1,
       timeModulus: 0x10000,
+      ticksPerSecond: 1000.0,
       numFeedValues: 14,
       screenSwitchCommand: false,
       checksumIsOptional: true,

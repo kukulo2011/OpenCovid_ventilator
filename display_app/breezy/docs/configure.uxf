@@ -7,12 +7,13 @@
       <x>100</x>
       <y>100</y>
       <w>200</w>
-      <h>100</h>
+      <h>110</h>
     </coordinates>
     <panel_attributes>BreezyConfiguration
 --
 version: 1
 name : String
+ticksPerSecond : double
 showBackButton : boolean
 sampleLog: List&lt;String&gt;
 </panel_attributes>
@@ -92,13 +93,13 @@ m2=values\n0..n</panel_attributes>
     <id>Relation</id>
     <coordinates>
       <x>200</x>
-      <y>190</y>
+      <y>200</y>
       <w>60</w>
-      <h>120</h>
+      <h>110</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;&lt;&lt;&lt;-
 m2=feed\n1</panel_attributes>
-    <additional_attributes>10.0;10.0;10.0;100.0</additional_attributes>
+    <additional_attributes>10.0;10.0;10.0;90.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>

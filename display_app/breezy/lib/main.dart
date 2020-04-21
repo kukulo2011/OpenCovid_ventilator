@@ -86,8 +86,7 @@ class BreezyHomePage extends StatefulWidget {
 
 class BreezyGlobals {
   final Settings settings = Settings();
-  config.BreezyConfiguration configuration =
-      config.BreezyConfiguration.defaultConfig;
+  config.BreezyConfiguration configuration;
 
   static Future<List<String>> getDeviceIPAddresses() async {
     final result = List<String>();
@@ -149,6 +148,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
     implements SettingsListener {
   final globals = BreezyGlobals();
   String settingsString = '';
+  Completer<void> _waitingForInit;
 
   @override
   void initState() {
@@ -157,12 +157,35 @@ class _BreezyHomePageState extends State<BreezyHomePage>
   }
 
   Future<void> asyncInit() async {
-    if (Settings.settingsFile == null) {
+    if (_waitingForInit != null) {
+      await _waitingForInit.future;
+    } else {
+      _waitingForInit = Completer<void>();
       Directory dir = await getApplicationSupportDirectory();
+      config.BreezyConfiguration.localStorage = Directory('${dir.path}/config');
       Settings.settingsFile = File("${dir.path}/settings.json");
       await globals.settings.read(globals);
-      settingsString = await globals.settings.forUI(globals);
+      final name = globals.settings.configurationName;
+      if (name == null) {
+        globals.configuration = config.BreezyConfiguration.defaultConfig;
+      } else {
+        try {
+          final c = await config.BreezyConfiguration.read(name);
+          if (c.name != name) {
+            throw Exception('Configuration name mismatch:  $name != ${c.name}');
+          }
+          globals.configuration = c;
+        } catch (ex, st) {
+          print(st);
+          print(ex);
+          // Unless someone manually deletes a config file, this shouldn't
+          // happen.
+          globals.configuration = config.BreezyConfiguration.defaultConfig;
+        }
+      }
+      _waitingForInit.complete(null);
     }
+    settingsString = await globals.settings.forUI(globals);
   }
 
   @override
@@ -201,7 +224,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                                 MaterialPageRoute(
                                     builder: (context) => GraphsScreen(
                                         dataSource: src,
-                                        config: globals.configuration)));
+                                        globals: globals)));
                           }
                         },
                         child: Row(
@@ -280,7 +303,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                                     builder: (context) => GraphsScreen(
                                         // dataSource: DeviceDataSource.screenDebug()
                                         dataSource: src,
-                                        config: globals.configuration))));
+                                        globals: globals))));
                           }
                         }),
                     Spacer(),
@@ -347,6 +370,7 @@ class Settings {
   String _securityString = UUID.random().toString();
   bool _meterData = true;
   String _bluetoothClassicAddress;
+  String _configurationName;
 
   Settings();
 
@@ -384,6 +408,10 @@ class Settings {
       if (v != null) {
         _bluetoothClassicAddress = v as String;
       }
+      v = json['configurationName'];
+      if (v != null) {
+        _configurationName = v as String;
+      }
     }
   }
 
@@ -395,7 +423,8 @@ class Settings {
       'meterData': _meterData,
       'socketPort': _socketPort,
       'securityString': _securityString,
-      'bluetoothClassicDevice': _bluetoothClassicAddress
+      'bluetoothClassicDevice': _bluetoothClassicAddress,
+      'configurationName': _configurationName
     };
     final str = convert.json.encode(json);
     await settingsFile.writeAsString(str);
@@ -459,6 +488,13 @@ class Settings {
     _notify();
   }
 
+  String get configurationName => _configurationName;
+
+  set configurationName(String v) {
+    _configurationName = v;
+    _notify();
+  }
+
   String get bluetoothClassicAddress => _bluetoothClassicAddress;
 
   set bluetoothClassicAddress(String d) {
@@ -475,6 +511,9 @@ class Settings {
     final result = StringBuffer();
     result.writeln("Settings:");
     result.writeln();
+    if (configurationName != null) {
+      result.writeln('    Configuration:  $configurationName');
+    }
     switch (inputSource) {
       case InputSource.serial:
         result.writeln('    Input from serial port $serialPortNumber');
