@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'dart:ui';
 import 'dart:math';
 import 'decimal_aligned_text.dart';
+import 'data_types.dart';
 import 'fitted_text.dart';
 
 /*
@@ -29,9 +30,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-class ValueBox extends StatelessWidget {
-  static final _borderColor = Colors.grey[700];
 
+class ValueBox extends StatelessWidget {
   final String value; // may be null
   final String label;
   final double labelHeightFactor;
@@ -40,6 +40,7 @@ class ValueBox extends StatelessWidget {
   final String units;
   final String prefix; // String before the value; may be null
   final String postfix; // String after the value; may be null
+  final ValueAlignment alignment;
   static final labelStyle = TextStyle(color: Colors.grey[400]);
 
   ValueBox(
@@ -50,7 +51,9 @@ class ValueBox extends StatelessWidget {
       @required this.color,
       this.units,
       this.prefix,
-      this.postfix}) {
+      this.postfix,
+      this.alignment = ValueAlignment.decimal,
+      Key key}) : super(key: key) {
     assert(label != null);
     assert(labelHeightFactor != null);
     assert(format != null);
@@ -64,23 +67,21 @@ class ValueBox extends StatelessWidget {
     return Container(
         padding: EdgeInsets.all(2.0),
         constraints: BoxConstraints.expand(),
-        decoration: BoxDecoration(
-            border: Border(
-                top: BorderSide(width: 1, color: _borderColor),
-                left: BorderSide(width: 1, color: _borderColor))),
         child: Stack(
           children: <Widget>[
             FractionallySizedBox(
                 widthFactor: 1.0,
                 heightFactor: labelHeightFactor,
-                child: FittedText(label, style: labelStyle)),
+                child: FittedText(label, key: key, style: labelStyle)),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Expanded(flex: labelSpaceFlex, child: Container()),
                 Expanded(
                   flex: 100 - labelSpaceFlex,
-                  child: DecimalAlignedText(
+                  child: AlignedText(
+                      key: key,
+                      alignment: alignment,
                       value: value,
                       prefix: prefix,
                       postfix: postfix,

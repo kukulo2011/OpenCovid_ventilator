@@ -34,7 +34,7 @@ class FittedText extends StatefulWidget {
   final TextStyle style;
   final bool useBaseline;
 
-  FittedText(this.value, {this.style, this.useBaseline = false}) {
+  FittedText(this.value, {Key key, this.style, this.useBaseline = false}) : super(key: key) {
     assert(value != null);
     assert(style == null || style.inherit);
     assert(useBaseline != null);
@@ -105,8 +105,10 @@ class _FittedTextPainter extends CustomPainter {
         textAlign: TextAlign.left,
         textDirection: TextDirection.ltr,
         maxLines: 1);
+    final y = (size.height - (state.valueHeight * fontSize / 100.0)) / 2;
+
     painter.layout();
-    painter.paint(canvas, const Offset(0, 0));
+    painter.paint(canvas, Offset(0, y));
   }
 
   @override

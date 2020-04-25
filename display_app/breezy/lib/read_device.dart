@@ -1,10 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show AssetBundle;
 import 'package:pedantic/pedantic.dart' show unawaited;
 
 import 'configure.dart';
+import 'configure_a.dart';
 import 'main.dart' show Log, Settings, BreezyGlobals;
-import 'deques.dart' show TimedData;
+import 'data_types.dart';
 import 'configure.dart' as config;
 import 'reader.dart';
 import 'dart:async';
@@ -51,22 +54,11 @@ class DeviceData {
   }
 }
 
-class ChartData extends TimedData {
-  final List<double> values;
-  @override
-  final double timeS; // Time in seconds
-
-  ChartData(this.timeS, this.values) {
-    assert(timeS != null);
-    assert(values != null);
-  }
-
-  ChartData.dummy(this.timeS) : values = null;
-}
-
 abstract class DeviceDataListener {
   Future<void> processDeviceData(DeviceData d);
-  Future<void> processNewConfiguration(BreezyConfiguration c);
+  Future<void> processNewConfiguration(
+      AndroidBreezyConfiguration c, DeviceDataSource nextSource);
+  Future<void> processEOF();
 }
 
 abstract class DeviceDataSource {
@@ -85,19 +77,26 @@ abstract class DeviceDataSource {
 
   /// A source that reads from a file that's baked into the asset bundle, or
   /// the screen configuration
-  static DeviceDataSource fromSampleLog(BreezyGlobals globals, AssetBundle b) =>
-      _AssetFileDataSource(globals, b);
+  static DeviceDataSource fromSampleLog(BreezyGlobals globals) =>
+      _SampleLogDataSource(globals);
 
   /// A source that takes serial data from the USB port
   static DeviceDataSource fromSerial(
           Settings settings, config.BreezyConfiguration configuration) =>
       _SerialDataSource(settings, configuration);
 
+  /// A source from an http/https connection.  The source can send a
+  /// "next-uri:" command to us, to specify the next URI to open.
+  /// It's relative to the previous URI.
+  static DeviceDataSource http(
+          Settings settings, config.BreezyConfiguration configuration) =>
+      _HttpDataSource(settings, configuration);
+
   /// A source that opens a server socket, and accepts connections to send
   /// us data.  Useful for debugging.
   static DeviceDataSource serverSocket(
           BreezyGlobals globals, AssetBundle bundle) =>
-      _ServerSocketDataSource(globals, bundle);
+      _ServerSocketDataSource(globals);
 
   /// A source using Bluetooth Classic/rfcomm
   static DeviceDataSource bluetoothClassic(BreezyGlobals globals) =>
@@ -106,7 +105,7 @@ abstract class DeviceDataSource {
   bool get running => _listener != null;
 
   @mustCallSuper
-  void start(DeviceDataListener listener) {
+  Future<void> start(DeviceDataListener listener) async {
     assert(listener != null);
     _listener = listener;
   }
@@ -126,7 +125,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
   Settings settings;
   ByteStreamReader reader;
   BreezyConfigurationJsonReader configReader;
-  final bool _meterData;
+  bool _meterData;
   final _lineBuffer = StringBuffer();
   int _lastTime; // Last time seen in file.  Starts out null
   int _currTime; // 64 bits, in ticks
@@ -141,10 +140,10 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
   }
 
   @override
-  void start(DeviceDataListener listener) {
-    super.start(listener);
+  Future<void> start(DeviceDataListener listener) async {
+    await super.start(listener);
     reader = createReader(settings);
-    unawaited(reader.start());
+    await reader.start();
   }
 
   ByteStreamReader createReader(Settings settings);
@@ -168,31 +167,34 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
 
   @override
   Future<void> receive(String data) async {
+    if (!running) {
+      return;
+    }
     for (int ch in data.codeUnits) {
       if (ch == _cr) {
         // skip
       } else if (ch == _newline || _lineBuffer.length > 500) {
         await receiveLine(_lineBuffer.toString());
         _lineBuffer.clear();
+        if (!running) {
+          return;
+        }
       } else {
         _lineBuffer.writeCharCode(ch);
       }
     }
   }
 
+  /// On a config change, we have the option of creating a new data source
+  /// so we can chain the next screen to this input.
+  DeviceDataSource _makeNextDataSource(config.BreezyConfiguration newConfig) =>
+      null;
+
   Future<void> receiveLine(String line) async {
     if (configReader != null) {
       configReader.acceptLine(line);
       if (configReader.done) {
-        try {
-          final newConfig = configReader.getResult();
-          await _listener.processNewConfiguration(newConfig);
-        } catch (ex, st) {
-          await send('\r\n\nStack trace:  $st\r\n\n');
-          await send('Error in new config:  $ex\r\n\n');
-        } finally {
-          configReader = null;
-        }
+        await _configReaderDone();
       }
       return;
     } else if (line.isEmpty || line.codeUnitAt(0) == _hash) {
@@ -201,6 +203,10 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
       return;
     } else if ('read-config' == line) {
       configReader = BreezyConfigurationJsonReader(compact: false);
+      return;
+    } else if (line.startsWith('meter-data:')) {
+      _meterData = line.substring(11).trim().toLowerCase() != 'off';
+      print('meterData set $_meterData from feed.');
       return;
     } else if (line.startsWith('read-config-compact:')) {
       try {
@@ -222,7 +228,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
       final numParts =
           feedSpec.numFeedValues + 4 + (feedSpec.screenSwitchCommand ? 1 : 0);
       if (parts.length != numParts) {
-        Log.writeln('Wrong # of commas in "$line"');
+        Log.writeln('Expected $numParts parts but got ${parts.length} in "$line"');
       } else if (parts[pos++] != feedSpec.protocolName) {
         Log.writeln('"${feedSpec.protocolName}" not first in "$line"');
       } else if (int.parse(parts[pos++]) != feedSpec.protocolVersion) {
@@ -254,6 +260,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
           if (checksum != crc.result) {
             Log.writeln(
                 'crc16 calculated:  ${crc.result} received:  $checksum');
+            return;
           }
         }
         assert(pos == parts.length);
@@ -263,7 +270,11 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
         if (_lastTime == null) {
           _currTime += _resetTimeGap;
         } else {
-          int deltaT = (time - _lastTime) % feedSpec.timeModulus;
+          int deltaT = time - _lastTime;
+          if (feedSpec.timeModulus != null) {
+            deltaT %=
+                feedSpec.timeModulus; // In Dart (unlike C), guaranteed positive
+          }
           if (deltaT <= 0) {
             throw Exception('bad deltaT:  $deltaT <= 0');
           }
@@ -293,6 +304,19 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
     }
   }
 
+  Future<void> _configReaderDone() async {
+    try {
+      final newConfig = configReader.getResult();
+      await _listener.processNewConfiguration(
+        newConfig, _makeNextDataSource(newConfig));
+    } catch (ex, st) {
+      await send('\r\n\nStack trace:  $st\r\n\n');
+      await send('Error in new config:  $ex\r\n\n');
+    } finally {
+      configReader = null;
+    }
+  }
+
   /// Send an informative message to our source, if that source is
   /// capable and interested.
   Future<void> send(String message) {
@@ -300,17 +324,16 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
   }
 }
 
-class _AssetFileDataSource extends _ByteStreamDataSource {
-  final AssetBundle bundle;
+class _SampleLogDataSource extends _ByteStreamDataSource {
   final BreezyConfiguration config;
 
-  _AssetFileDataSource(BreezyGlobals globals, this.bundle)
+  _SampleLogDataSource(BreezyGlobals globals)
       : this.config = globals.configuration,
         super(globals.settings, globals.configuration, true);
 
   @override
   ByteStreamReader createReader(Settings settings) {
-    return AssetFileReader(settings, config, bundle, this);
+    return AssetFileReader(settings, config, this);
   }
 }
 
@@ -324,15 +347,87 @@ class _SerialDataSource extends _ByteStreamDataSource {
   }
 }
 
+class _HttpDataSource extends _ByteStreamDataSource {
+  HttpClient client;
+  Uri nextUri;
+  Uri lastUri;
+
+  _HttpDataSource(Settings settings, config.BreezyConfiguration configuration)
+      : super(settings, configuration, settings.meterData) {
+    nextUri = Uri.parse(settings.httpUrl);
+  }
+
+  @override
+  DeviceDataSource _makeNextDataSource(config.BreezyConfiguration newConfig) {
+    if (nextUri == null) {
+      return null;
+    }
+    final result = _HttpDataSource(settings, newConfig);
+    result.nextUri = nextUri;
+    nextUri = null;
+    return result;
+  }
+
+  @override
+  ByteStreamReader createReader(Settings settings) {
+    lastUri = nextUri;
+    nextUri = null;
+    return HttpReader(client, lastUri, settings, this);
+  }
+
+  @override
+  Future<void> start(DeviceDataListener listener) async {
+    await super.start(listener);
+    client = HttpClient();
+  }
+
+  @override
+  Future<void> receiveLine(String line) {
+    if (line.startsWith('next-url:')) {
+      try {
+        final maybeRelative = Uri.parse(line.substring(9).trim());
+        nextUri = lastUri.resolveUri(maybeRelative);
+      } catch (ex) {
+        Log.writeln('Invalid Uri from http connection:  $line');
+      }
+    } else {
+      return super.receiveLine(line);
+    }
+  }
+
+  @override
+  void stop() {
+    super.stop();
+    client?.close();
+  }
+
+  @override
+  Future<void> reset() async {
+    await super.reset();
+    if (running) {
+      if (configReader != null) {
+        configReader.acceptEOF();
+        assert(configReader.done);
+        await _configReaderDone();
+      }
+      if (nextUri == null) {
+        unawaited(_listener.processEOF());
+      } else {
+        reader = createReader(settings);
+        unawaited(reader.start());
+      }
+    }
+  }
+}
+
 class _ServerSocketDataSource extends _ByteStreamDataSource {
   final int portNumber;
   final String securityString;
   final BreezyConfiguration config;
-  final AssetBundle bundle;
   bool firstLineMatched = false;
   ServerSocketReader socketReader;
 
-  _ServerSocketDataSource(BreezyGlobals globals, this.bundle)
+  _ServerSocketDataSource(BreezyGlobals globals)
       : this.portNumber = globals.settings.socketPort,
         this.securityString = globals.settings.securityString,
         this.config = globals.configuration,
@@ -364,11 +459,11 @@ class _ServerSocketDataSource extends _ByteStreamDataSource {
         return;
       } else if (line == 'write-config') {
         await send('\r\n');
-        await config.writeJson(socketReader.getSink(), bundle);
+        await config.writeJson(socketReader.getSink());
         await send('\r\n');
       } else if (line == 'write-config-compact') {
         await send('\r\n');
-        await config.writeCompact(socketReader.getSink(), bundle);
+        await config.writeCompact(socketReader.getSink());
         await send('\r\n');
       } else if (line == 'help') {
         await send('\r\n');
@@ -413,6 +508,9 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
   static List<_ScreenDebugFunction> functions = [
     (double time, config.Value spec) {
       final range = spec.demoMaxValue - spec.demoMinValue;
+      if (range <= 0) {
+        return spec.demoMinValue;
+      }
       final frobbed = time.remainder(3.7);
       return _random.nextDouble() * range / 50 +
           (frobbed < 1.5
@@ -447,8 +545,8 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
   }
 
   @override
-  void start(DeviceDataListener listener) {
-    super.start(listener);
+  Future<void> start(DeviceDataListener listener) async {
+    await super.start(listener);
     unawaited(_sendEvents());
     // _timer = Timer.periodic(Duration(milliseconds: 20), (_) => _tick());
   }

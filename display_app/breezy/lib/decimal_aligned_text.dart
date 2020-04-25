@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'dart:ui';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'dart:math' show min, max;
+import 'data_types.dart';
 
 /*
 MIT License
@@ -30,8 +31,9 @@ SOFTWARE.
 
 /// A box that shows a numeric value, along with a label and units.
 ///
-class DecimalAlignedText extends StatefulWidget {
+class AlignedText extends StatefulWidget {
   final String value; // may be null
+  final ValueAlignment alignment;
   final String format;
 
   /// Shown before the value
@@ -52,8 +54,9 @@ class DecimalAlignedText extends StatefulWidget {
   /// [scale] is how completely the box is filled.  By default, it's 0.95,
   /// to give a little margin for error if the format string isn't exactly
   /// as wide as the widest value when rendered.
-  DecimalAlignedText(
+  AlignedText(
       {@required this.value,
+        @required this.alignment,
       @required this.format,
       @required this.color,
       this.prefix,
@@ -61,16 +64,17 @@ class DecimalAlignedText extends StatefulWidget {
       this.units,
       this.unitsHeightFraction = 0.16,
       this.scale = 0.95,
-      this.useBaseline = true}) {
+      this.useBaseline = true,
+      Key key}) : super(key: key) {
     assert(format != null);
     assert(color != null);
   }
 
   @override
-  _DecimalAlignedTextState createState() => _DecimalAlignedTextState();
+  _AlignedTextState createState() => _AlignedTextState();
 }
 
-class _DecimalAlignedTextState extends State<DecimalAlignedText> {
+class _AlignedTextState extends State<AlignedText> {
   NumberFormat numberFormat;
   bool noDecimal;
   int decimalIndex; // If no decimal, length of format string
@@ -86,9 +90,13 @@ class _DecimalAlignedTextState extends State<DecimalAlignedText> {
   @override
   void initState() {
     super.initState();
-    decimalIndex = widget.format.indexOf('.');
-    RenderParagraph p;
+    if (widget.alignment == ValueAlignment.decimal) {
+      decimalIndex = widget.format.indexOf('.');
+    } else {
+      decimalIndex = -1;
+    }
     noDecimal = decimalIndex == -1;
+    RenderParagraph p;
     if (noDecimal) {
       decimalIndex = widget.format.length;
       valueAfterWidth = 0;
@@ -158,8 +166,8 @@ class _DecimalAlignedTextState extends State<DecimalAlignedText> {
 }
 
 class _ValueBoxPainter extends CustomPainter {
-  final _DecimalAlignedTextState state;
-  final DecimalAlignedText widget;
+  final _AlignedTextState state;
+  final AlignedText widget;
   final String value;
 
   _ValueBoxPainter(this.state)
@@ -225,8 +233,20 @@ class _ValueBoxPainter extends CustomPainter {
             textAlign: TextAlign.left);
         p.layout(BoxConstraints());
         final double beforeReal = p.getMaxIntrinsicWidth(double.infinity);
+        switch(widget.alignment) {
+          case ValueAlignment.left:
+            _paintText(x, vy, span, canvas);
+            break;
+          case ValueAlignment.center:
+            _paintText(x + (beforeW - beforeReal)/2.0, vy, span, canvas);
+            break;
+          case ValueAlignment.right:
+            // Fall through
+          case ValueAlignment.decimal:
+          _paintText(x + beforeW - beforeReal, vy, span, canvas);
+            break;
+        }
         x += beforeW;
-        _paintText(x - beforeReal, vy, span, canvas);
       }
       if (decimalIndex != value.length) {
         final span =

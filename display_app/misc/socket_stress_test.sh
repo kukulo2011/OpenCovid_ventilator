@@ -18,4 +18,4 @@ fi
 
 addr=$1
 port=$2
-yes "stress test" | nl | nc $addr $port
+(echo "meter-data:on" ; yes "stress test") | nl | nc $addr $port

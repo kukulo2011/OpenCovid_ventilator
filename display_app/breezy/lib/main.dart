@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show AssetBundle;
 import 'package:pedantic/pedantic.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:connectivity/connectivity.dart'
@@ -9,12 +10,13 @@ import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
     show BluetoothDevice, FlutterBluetoothSerial;
 import 'dart:io' show exit, File, Directory, NetworkInterface;
 import 'dart:convert' as convert;
-import 'dart:math' show Random;
+import 'utils.dart';
 import 'input_test.dart';
 import 'graphs_screen.dart';
 import 'read_device.dart';
 import 'settings_screen.dart';
 import 'configure.dart' as config;
+import 'configure_a.dart' as config;
 
 /*
 MIT License
@@ -64,7 +66,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       // debugShowCheckedModeBanner: false,
-      title: 'Breezy Prototype',
+      title: 'Breezy Display',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
@@ -156,31 +158,35 @@ class _BreezyHomePageState extends State<BreezyHomePage>
     globals.settings.listeners.add(this);
   }
 
-  Future<void> asyncInit() async {
+  Future<void> asyncInit(AssetBundle bundle) async {
     if (_waitingForInit != null) {
       await _waitingForInit.future;
     } else {
       _waitingForInit = Completer<void>();
       Directory dir = await getApplicationSupportDirectory();
-      config.BreezyConfiguration.localStorage = Directory('${dir.path}/config');
+      config.AndroidBreezyConfiguration.localStorage = Directory('${dir.path}/config');
+      config.AndroidBreezyConfiguration.assetBundle = bundle;
       Settings.settingsFile = File("${dir.path}/settings.json");
       await globals.settings.read(globals);
       final name = globals.settings.configurationName;
       if (name == null) {
-        globals.configuration = config.BreezyConfiguration.defaultConfig;
+        globals.configuration = config.DefaultBreezyConfiguration.defaultConfig;
       } else {
         try {
-          final c = await config.BreezyConfiguration.read(name);
+          final c = await config.JsonBreezyConfiguration.read(name);
           if (c.name != name) {
             throw Exception('Configuration name mismatch:  $name != ${c.name}');
           }
           globals.configuration = c;
         } catch (ex, st) {
+          print('Error reading configuration $name!');
           print(st);
           print(ex);
           // Unless someone manually deletes a config file, this shouldn't
           // happen.
-          globals.configuration = config.BreezyConfiguration.defaultConfig;
+          globals.configuration = config.DefaultBreezyConfiguration.defaultConfig;
+          globals.settings.configurationName = null;
+
         }
       }
       _waitingForInit.complete(null);
@@ -197,8 +203,8 @@ class _BreezyHomePageState extends State<BreezyHomePage>
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
-        future: asyncInit(),
-        builder: (context, snapshot) {
+        future: asyncInit(DefaultAssetBundle.of(context)),
+    builder: (context, snapshot) {
           return doBuild(context);
         });
   }
@@ -218,14 +224,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                     PopupMenuItem<void Function()>(
                         value: () {
                           DeviceDataSource src = _createDataSource(context);
-                          if (src != null) {
-                            Navigator.push<void>(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => GraphsScreen(
-                                        dataSource: src,
-                                        globals: globals)));
-                          }
+                          unawaited(_showGraphsScreen(src));
                         },
                         child: Row(
                           children: <Widget>[
@@ -296,15 +295,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                         ]),
                         onPressed: () async {
                           DeviceDataSource src = _createDataSource(context);
-                          if (src != null) {
-                            unawaited(Navigator.push<void>(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => GraphsScreen(
-                                        // dataSource: DeviceDataSource.screenDebug()
-                                        dataSource: src,
-                                        globals: globals))));
-                          }
+                          unawaited(_showGraphsScreen(src));
                         }),
                     Spacer(),
                   ],
@@ -329,10 +320,11 @@ class _BreezyHomePageState extends State<BreezyHomePage>
         }
         break;
       case InputSource.sampleLog:
-        return DeviceDataSource.fromSampleLog(
-            globals, DefaultAssetBundle.of(context));
+        return DeviceDataSource.fromSampleLog(globals);
       case InputSource.screenDebug:
         return DeviceDataSource.screenDebug(globals.configuration);
+      case InputSource.http:
+        return DeviceDataSource.http(globals.settings, globals.configuration);
       case InputSource.serverSocket:
         return DeviceDataSource.serverSocket(
             globals, DefaultAssetBundle.of(context));
@@ -340,6 +332,17 @@ class _BreezyHomePageState extends State<BreezyHomePage>
         return DeviceDataSource.bluetoothClassic(globals);
     }
     return null;
+  }
+
+  Future<void> _showGraphsScreen(DeviceDataSource src) async {
+    while (src != null) {
+      src = await Navigator.push<DeviceDataSource>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => GraphsScreen(
+            dataSource: src,
+            globals: globals)));
+    }
   }
 
   @override
@@ -352,6 +355,7 @@ enum InputSource {
   serial,
   screenDebug,
   sampleLog,
+  http,
   serverSocket,
   bluetoothClassic
 }
@@ -364,11 +368,12 @@ class Settings {
   static File settingsFile;
   final listeners = List<SettingsListener>();
   InputSource _inputSource = InputSource.sampleLog;
+  String _httpUrl = 'https://breezy-display.jovial.com/weather_demo.breezy';
   int _serialPortNumber = 1;
   int _baudRate = 115200;
   int _socketPort = 7777;
   String _securityString = UUID.random().toString();
-  bool _meterData = true;
+  bool _meterData = false;
   String _bluetoothClassicAddress;
   String _configurationName;
 
@@ -387,6 +392,10 @@ class Settings {
       v = json['serialPortNumber'];
       if (v != null) {
         _serialPortNumber = v as int;
+      }
+      v = json['httpUrl'];
+      if (v != null) {
+        _httpUrl = v as String;
       }
       v = json['baudRate'];
       if (v != null) {
@@ -418,6 +427,7 @@ class Settings {
   Future<void> write() async {
     final json = {
       'inputSource': _inputSource.toString(),
+      'httpUrl' : _httpUrl,
       'serialPortNumber': _serialPortNumber,
       'baudRate': _baudRate,
       'meterData': _meterData,
@@ -443,6 +453,11 @@ class Settings {
     _notify();
   }
 
+  String get httpUrl => _httpUrl;
+  set httpUrl(String v) {
+    _httpUrl = v;
+    _notify();
+  }
   /// 1..n, or 0 if none selected
   int get serialPortNumber => _serialPortNumber;
   set serialPortNumber(int v) {
@@ -528,6 +543,11 @@ class Settings {
       case InputSource.sampleLog:
         result.writeln('    Input from sample log file');
         break;
+      case InputSource.http:
+        result.writeln('    Input from $httpUrl');
+        result.writeln(
+          '        meter incoming data by time:  $meterData');
+        break;
       case InputSource.serverSocket:
         {
           final localAddresses = await BreezyGlobals.getDeviceIPAddresses();
@@ -535,7 +555,7 @@ class Settings {
           result.writeln('    Connect to port:  $socketPort');
           result.writeln('    First line of input must be "$securityString"');
           result.writeln(
-              '        meter incoming data by time (for debug):  $meterData');
+              '        meter incoming data by time:  $meterData');
           result.writeln(
               '    ${localAddresses.length} available network interface(s):');
           for (final s in localAddresses) {
@@ -555,43 +575,33 @@ class Settings {
   }
 }
 
-/// A minimal implementation of v4 UUIDs.
-/// cf. https://tools.ietf.org/html/rfc4122
-class UUID {
-  final int time_low; // 4 bytes
-  final int time_mid; // 2 bytes
-  final int time_hi_and_version; // 2 bytes
-  final int clock_seq_hi_and_reserved; // 1 byte
-  final int clock_seq_low; // 1 byte
-  final int node; // 6 bytes
-
-  static final Random _random = Random.secure();
-
-  /// Generate a random (v4) UUID
-  UUID.random()
-      : clock_seq_hi_and_reserved = 0x80 | _random.nextInt(0x40),
-        time_hi_and_version = 0x4000 | _random.nextInt(0x1000),
-        time_low = _random.nextInt(0x100000000),
-        time_mid = _random.nextInt(0x10000),
-        clock_seq_low = _random.nextInt(0x100),
-        node = (_random.nextInt(0x10000) << 8) | _random.nextInt(0x100000000);
-
-  String toString() {
-    return toHex(time_low, 8) +
-        '-' +
-        toHex(time_mid, 4) +
-        '-' +
-        toHex(time_hi_and_version, 4) +
-        '-' +
-        toHex(clock_seq_hi_and_reserved, 2) + // no dash
-        toHex(clock_seq_low, 2) +
-        '-' +
-        toHex(node, 12);
-  }
-}
-
-String toHex(int value, int digits) {
-  String s = value.toRadixString(16);
-  const String zeros = '0000000000000000'; // Enough for 64 bits
-  return zeros.substring(0, digits - s.length) + s;
-}
+Future<void> showErrorDialog(BuildContext context, String message, Object exception) => showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      String exs = 'Error';
+      try {
+        exs = exception.toString();
+      } catch (ex) {
+        print('Error in exception.toString()');
+      }
+      // return object of type Dialog
+      return AlertDialog(
+        title: Text(message),
+        content: SingleChildScrollView(
+          child: Column(children: [
+            SizedBox(height: 20),
+            Text(exs),
+          ]),
+        ),
+        actions: <Widget>[
+          // usually buttons at the bottom of the dialog
+          FlatButton(
+            child: Text('OK'),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          )
+        ],
+      );
+    },
+  );

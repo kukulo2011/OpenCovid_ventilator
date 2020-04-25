@@ -4,7 +4,7 @@
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>100</x>
+      <x>50</x>
       <y>100</y>
       <w>200</w>
       <h>110</h>
@@ -22,7 +22,7 @@ sampleLog: List&lt;String&gt;
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>220</x>
+      <x>170</x>
       <y>20</y>
       <w>680</w>
       <h>40</h>
@@ -35,7 +35,7 @@ lw=0	</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>430</x>
+      <x>380</x>
       <y>110</y>
       <w>120</w>
       <h>50</h>
@@ -48,7 +48,7 @@ name : String</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>130</x>
+      <x>80</x>
       <y>290</y>
       <w>240</w>
       <h>110</h>
@@ -66,7 +66,7 @@ screenSwitchCommand : bool
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>180</x>
+      <x>130</x>
       <y>510</y>
       <w>200</w>
       <h>60</h>
@@ -80,7 +80,7 @@ keepOriginalFormat : bool</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>120</x>
+      <x>70</x>
       <y>390</y>
       <w>90</w>
       <h>90</h>
@@ -92,7 +92,7 @@ m2=values\n0..n</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>200</x>
+      <x>150</x>
       <y>200</y>
       <w>60</w>
       <h>110</h>
@@ -104,7 +104,7 @@ m2=feed\n1</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>290</x>
+      <x>240</x>
       <y>130</y>
       <w>160</w>
       <h>50</h>
@@ -116,7 +116,7 @@ m2=screens\n1..n</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>780</x>
+      <x>730</x>
       <y>90</y>
       <w>110</w>
       <h>50</h>
@@ -130,7 +130,7 @@ flex : int
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>630</x>
+      <x>580</x>
       <y>280</y>
       <w>100</w>
       <h>50</h>
@@ -143,7 +143,7 @@ flex : int
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>480</x>
+      <x>430</x>
       <y>280</y>
       <w>120</w>
       <h>50</h>
@@ -156,7 +156,7 @@ flex : int
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>550</x>
+      <x>500</x>
       <y>190</y>
       <w>140</w>
       <h>50</h>
@@ -170,7 +170,7 @@ flex : int
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>550</x>
+      <x>500</x>
       <y>230</y>
       <w>90</w>
       <h>70</h>
@@ -181,7 +181,7 @@ flex : int
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>610</x>
+      <x>560</x>
       <y>230</y>
       <w>80</w>
       <h>70</h>
@@ -192,7 +192,7 @@ flex : int
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>570</x>
+      <x>520</x>
       <y>440</y>
       <w>220</w>
       <h>180</h>
@@ -215,10 +215,10 @@ labelHeightFactor: double
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>840</x>
+      <x>790</x>
       <y>440</y>
-      <w>210</w>
-      <h>150</h>
+      <w>290</w>
+      <h>160</h>
     </coordinates>
     <panel_attributes>ValueBox
 --
@@ -228,13 +228,14 @@ labelHeightFactor : double
 units : String
 format : String
 prefix : String
-postfix : String</panel_attributes>
+postfix : String
+align: enum - left, center, right, decimal</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>930</x>
+      <x>840</x>
       <y>180</y>
       <w>120</w>
       <h>60</h>
@@ -248,7 +249,7 @@ color: String</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>620</x>
+      <x>570</x>
       <y>100</y>
       <w>180</w>
       <h>110</h>
@@ -260,7 +261,7 @@ m2=content\n0..n</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>640</x>
+      <x>590</x>
       <y>130</y>
       <w>200</w>
       <h>80</h>
@@ -271,7 +272,7 @@ m2=content\n0..n</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>720</x>
+      <x>670</x>
       <y>190</y>
       <w>120</w>
       <h>50</h>
@@ -284,7 +285,7 @@ m2=content\n0..n</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>450</x>
+      <x>400</x>
       <y>150</y>
       <w>120</w>
       <h>110</h>
@@ -296,7 +297,7 @@ m2=portrait,\nlandscape\n1..2</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>770</x>
+      <x>720</x>
       <y>130</y>
       <w>70</w>
       <h>80</h>
@@ -307,42 +308,42 @@ m2=portrait,\nlandscape\n1..2</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>810</x>
+      <x>760</x>
       <y>130</y>
-      <w>200</w>
+      <w>160</w>
       <h>70</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;-</panel_attributes>
-    <additional_attributes>10.0;10.0;10.0;40.0;180.0;40.0;180.0;50.0</additional_attributes>
+    <additional_attributes>10.0;10.0;10.0;40.0;140.0;40.0;140.0;50.0</additional_attributes>
   </element>
   <element>
     <id>UMLNote</id>
     <coordinates>
-      <x>930</x>
-      <y>70</y>
-      <w>110</w>
+      <x>880</x>
+      <y>80</y>
+      <w>220</w>
       <h>50</h>
     </coordinates>
-    <panel_attributes>flex ignored
-at root node
+    <panel_attributes>flex ignored at root node,
+optional (and rare) for Border
 bg=yellow</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>880</x>
-      <y>80</y>
+      <x>830</x>
+      <y>90</y>
       <w>70</w>
-      <h>60</h>
+      <h>50</h>
     </coordinates>
     <panel_attributes>lt=.</panel_attributes>
-    <additional_attributes>10.0;40.0;50.0;10.0</additional_attributes>
+    <additional_attributes>10.0;30.0;50.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>740</x>
+      <x>690</x>
       <y>350</y>
       <w>130</w>
       <h>50</h>
@@ -355,7 +356,7 @@ id : String</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>690</x>
+      <x>640</x>
       <y>390</y>
       <w>130</w>
       <h>70</h>
@@ -366,7 +367,7 @@ id : String</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>790</x>
+      <x>740</x>
       <y>390</y>
       <w>160</w>
       <h>70</h>
@@ -377,7 +378,7 @@ id : String</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>370</x>
+      <x>320</x>
       <y>350</y>
       <w>390</w>
       <h>110</h>
@@ -389,7 +390,7 @@ m2=displayers\n1..n</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>750</x>
+      <x>700</x>
       <y>260</y>
       <w>140</w>
       <h>50</h>
@@ -402,7 +403,7 @@ displayerID: String</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>830</x>
+      <x>780</x>
       <y>300</y>
       <w>40</w>
       <h>70</h>
@@ -414,7 +415,7 @@ m1=1</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>810</x>
+      <x>760</x>
       <y>130</y>
       <w>70</w>
       <h>150</h>
@@ -425,7 +426,7 @@ m1=1</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>230</x>
+      <x>180</x>
       <y>600</y>
       <w>100</w>
       <h>40</h>
@@ -437,7 +438,7 @@ m1=1</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>270</x>
+      <x>220</x>
       <y>560</y>
       <w>30</w>
       <h>60</h>
@@ -448,19 +449,19 @@ m1=1</panel_attributes>
   <element>
     <id>UMLNote</id>
     <coordinates>
-      <x>910</x>
+      <x>860</x>
       <y>360</y>
-      <w>120</w>
+      <w>150</w>
       <h>30</h>
     </coordinates>
-    <panel_attributes>dataID == id
+    <panel_attributes>displayerID == id
 bg=yellow</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>830</x>
+      <x>780</x>
       <y>310</y>
       <w>130</w>
       <h>70</h>
@@ -471,7 +472,7 @@ bg=yellow</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>910</x>
+      <x>860</x>
       <y>260</y>
       <w>170</w>
       <h>50</h>
@@ -484,7 +485,7 @@ color: String</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>810</x>
+      <x>760</x>
       <y>130</y>
       <w>200</w>
       <h>150</h>
@@ -495,7 +496,7 @@ color: String</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>190</x>
+      <x>140</x>
       <y>420</y>
       <w>190</w>
       <h>60</h>
@@ -509,12 +510,99 @@ demoMaxValue : double</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>270</x>
+      <x>220</x>
       <y>470</y>
       <w>30</w>
       <h>60</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;-</panel_attributes>
     <additional_attributes>10.0;10.0;10.0;40.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLNote</id>
+    <coordinates>
+      <x>640</x>
+      <y>630</y>
+      <w>390</w>
+      <h>50</h>
+    </coordinates>
+    <panel_attributes>All JSON values may have a List&lt;String&gt; comment.
+It is not read in.
+bg=yellow</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>980</x>
+      <y>180</y>
+      <w>120</w>
+      <h>60</h>
+    </coordinates>
+    <panel_attributes>Border
+--
+color: String
+width: double</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>760</x>
+      <y>130</y>
+      <w>290</w>
+      <h>70</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;-</panel_attributes>
+    <additional_attributes>10.0;10.0;10.0;40.0;270.0;40.0;270.0;50.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>1020</x>
+      <y>120</y>
+      <w>80</w>
+      <h>80</h>
+    </coordinates>
+    <panel_attributes>lt=.</panel_attributes>
+    <additional_attributes>60.0;60.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLNote</id>
+    <coordinates>
+      <x>340</x>
+      <y>600</y>
+      <w>170</w>
+      <h>100</h>
+    </coordinates>
+    <panel_attributes>Strings values in CSV
+feed may contain:
+    \c  =&gt; ","
+    \n  =&gt; newline
+    \\  =&gt; \
+bg=yellow</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>320</x>
+      <y>450</y>
+      <w>100</w>
+      <h>170</h>
+    </coordinates>
+    <panel_attributes>lt=.</panel_attributes>
+    <additional_attributes>80.0;150.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>320</x>
+      <y>530</y>
+      <w>100</w>
+      <h>90</h>
+    </coordinates>
+    <panel_attributes>lt=.</panel_attributes>
+    <additional_attributes>80.0;70.0;10.0;10.0</additional_attributes>
   </element>
 </diagram>

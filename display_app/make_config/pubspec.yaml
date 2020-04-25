@@ -1,0 +1,16 @@
+name: make_config
+description: A command-line application to make configuration JSON files.
+
+environment:
+  sdk: '>=2.7.0 <3.0.0'
+
+dependencies:
+  intl: ^0.16.1
+  quiver: ^2.0.5
+  path: ^1.6.4
+  archive: ^2.0.11
+  csslib: ^0.16.1       #  Used just for the Color class :-(
+
+
+dev_dependencies:
+  pedantic: ^1.8.0

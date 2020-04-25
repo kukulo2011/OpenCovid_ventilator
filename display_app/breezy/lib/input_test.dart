@@ -70,13 +70,17 @@ class _InputTestPageState extends State<InputTestPage>
         break;
       case InputSource.sampleLog:
         reader = AssetFileReader(widget.globals.settings,
-            widget.globals.configuration, widget.bundle, this);
+            widget.globals.configuration, this);
         break;
       case InputSource.serverSocket:
         reader = ServerSocketReader(widget.globals.settings, this);
         break;
       case InputSource.bluetoothClassic:
         reader = BluetoothClassicReader(widget.globals.settings, this);
+        break;
+      case InputSource.http:
+        reader = HttpReader(null, Uri.parse(widget.globals.settings.httpUrl),
+            widget.globals.settings, this);
         break;
     }
     if (reader == null) {

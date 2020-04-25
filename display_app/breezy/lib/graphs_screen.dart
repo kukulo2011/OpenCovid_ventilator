@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:charts_flutter/flutter.dart' as charts;
 import 'package:screen/screen.dart' show Screen;
 import 'package:pedantic/pedantic.dart';
+import 'value_box.dart';
+import 'rolling_chart.dart';
 import 'dart:async';
 import 'configure.dart' as config;
-import 'deques.dart';
+import 'configure_a.dart' as config;
+import 'data_types.dart';
 import 'read_device.dart';
-import 'main.dart' show Log, BreezyGlobals;
+import 'main.dart' show Log, BreezyGlobals, showErrorDialog;
+import 'fitted_text.dart';
 
 /*
 MIT License
@@ -52,17 +57,15 @@ class GraphsScreen extends StatefulWidget {
         super(key: key);
 
   @override
-  _GraphsScreenState createState() =>
-      _GraphsScreenState(_dataSource, _globals);
+  _GraphsScreenState createState() => _GraphsScreenState(_dataSource, _globals);
 }
 
 class HistoricalData {
   DeviceData _current;
   final List<WindowedData<ChartData>> _deques;
-  final void Function() advanceScreen;
+  void Function() advanceScreen;
 
-  HistoricalData(config.DataFeed feed, this.advanceScreen)
-      : this._deques = feed.createDeques();
+  HistoricalData(config.DataFeed feed) : this._deques = feed.createDeques();
 
   DeviceData get current => _current;
 
@@ -80,15 +83,20 @@ class _GraphsScreenState extends State<GraphsScreen>
     implements DeviceDataListener {
   final DeviceDataSource _dataSource;
   final BreezyGlobals globals;
-  HistoricalData _data;
-  static final _borderColor = Colors.grey[700];
+  final HistoricalData _data;
   config.Screen screen;
   int screenNum;
   Completer<void> _waitingForBuild;
   DateTime _lastBuild = DateTime.now(); // never null
+  final _WidgetBuilder _builder;
+  bool _disposed = false;
+  bool _popCalled = false;
 
-  _GraphsScreenState(this._dataSource, this.globals) {
-    _data = HistoricalData(globals.configuration.feed, advanceScreen);
+  _GraphsScreenState(this._dataSource, this.globals)
+      : _data = HistoricalData(globals.configuration.feed),
+        _builder = _WidgetBuilder(globals.configuration.feed) {
+    _data.advanceScreen = advanceScreen;
+    _builder.data = _data;
   }
 
   @override
@@ -96,13 +104,27 @@ class _GraphsScreenState extends State<GraphsScreen>
     super.initState();
     screenNum = 0;
     screen = globals.configuration.screens[screenNum];
-    _dataSource.start(this);
-    unawaited(Screen.keepOn(true));
+    unawaited(() async {
+      await Screen.keepOn(true);
+      try {
+        await _dataSource.start(this);
+      } catch (ex, st) {
+        print(st);
+        if (!_disposed) {
+          await showErrorDialog(context, "Error opening connection", ex);
+        }
+        if (!_disposed && !_popCalled) {
+          _popCalled = true;
+          Navigator.of(context).pop();
+        }
+      }
+    }());
   }
 
   @override
   void dispose() {
     super.dispose();
+    _disposed = true;
     _dataSource.stop();
     unawaited(Screen.keepOn(false));
     _notifyBuild();
@@ -162,12 +184,7 @@ class _GraphsScreenState extends State<GraphsScreen>
                         right: BorderSide(width: 2, color: Colors.transparent),
                         bottom:
                             BorderSide(width: 2, color: Colors.transparent))),
-                child: Container(
-                    decoration: BoxDecoration(
-                        border: Border(
-                            right: BorderSide(width: 1, color: _borderColor),
-                            bottom: BorderSide(width: 1, color: _borderColor))),
-                    child: buildMainContents())),
+                child: buildMainContents()),
             SizedBox(
                 width: 20,
                 height: 20,
@@ -184,7 +201,11 @@ class _GraphsScreenState extends State<GraphsScreen>
                   color: Colors.transparent,
                   child: Container(),
                   padding: const EdgeInsets.all(0),
-                  onPressed: () => Navigator.of(context).pop()),
+                  onPressed: () {
+                    if (!_popCalled) {
+                      _popCalled = true;
+                      Navigator.of(context).pop();
+                    }}),
             ),
             // We show a tiny arrow, but make the touch area bigger.
           ]),
@@ -193,19 +214,166 @@ class _GraphsScreenState extends State<GraphsScreen>
 
   Widget buildMainContents() {
     return OrientationBuilder(
-        builder: (BuildContext context, Orientation orientation) =>
-            orientation == Orientation.portrait
-                ? screen.portrait.build(_data)
-                : screen.landscape.build(_data));
+        builder: (BuildContext context, Orientation orientation) {
+      if (orientation == Orientation.portrait) {
+        screen.portrait.accept(_builder);
+      } else {
+        screen.landscape.accept(_builder);
+      }
+      final r = _builder.built;
+      _builder.built = null;
+      return r;
+    });
   }
 
   @override
-  Future<void> processNewConfiguration(config.BreezyConfiguration newConfig) async {
-    // TODO:  Save to filesystem
+  Future<void> processNewConfiguration(
+      config.AndroidBreezyConfiguration newConfig,
+      DeviceDataSource nextSource) async {
     await newConfig.save();
     globals.configuration = newConfig;
     globals.settings.configurationName = newConfig.name;
     await globals.settings.write();
-    Navigator.of(context).pop();
+    if (!_popCalled) {
+      _popCalled = true;
+      Navigator.of(context).pop(nextSource);
+    }
+  }
+
+  @override
+  Future<void> processEOF() async {
+    if (!_popCalled) {
+      _popCalled = true;
+      Navigator.of(context).pop();
+    }
+  }
+}
+
+class _WidgetBuilder
+    implements config.ScreenWidgetVisitor<Color, charts.Color> {
+  HistoricalData data;
+  Widget built;
+  List<double Function(ChartData d)> _selectors;
+
+  _WidgetBuilder(config.DataFeed feed) {
+    _selectors = List<double Function(ChartData d)>(feed.chartedValues.length);
+    for (int i = 0; i < _selectors.length; i++) {
+      _selectors[i] = (ChartData d) => d.values?.elementAt(i);
+    }
+  }
+
+  Widget _wrapIfNeeded(config.ScreenWidget<Color, charts.Color> c, Widget w) {
+    if (c.hasParent && c.flex != null) {
+      return Expanded(flex: c.flex, child: w);
+    } else {
+      return w;
+    }
+  }
+
+  List<Widget> _buildChildren(config.ScreenContainer<Color, charts.Color> c) {
+    final result = List<Widget>(c.content.length);
+    for (int i = 0; i < result.length; i++) {
+      c.content[i].accept(this);
+      result[i] = built;
+    }
+    return result;
+  }
+
+  @override
+  void visitColumn(config.ScreenColumn<Color, charts.Color> w) {
+    built = _wrapIfNeeded(
+        w,
+        Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: _buildChildren(w)));
+  }
+
+  @override
+  void visitRow(config.ScreenRow<Color, charts.Color> w) {
+    built = _wrapIfNeeded(
+        w,
+        Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: _buildChildren(w)));
+  }
+
+  @override
+  void visitLabel(config.Label<Color, charts.Color> w) {
+    built =
+        _wrapIfNeeded(w, FittedText(w.text, style: TextStyle(color: w.color)));
+  }
+
+  @override
+  void visitSpacer(config.Spacer<Color, charts.Color> w) {
+    built = Spacer(flex: w.flex);
+  }
+
+  @override
+  visitBorder(config.Border<Color, charts.Color> w) {
+    final constraints = w.parentIsRow
+        ? BoxConstraints.expand(width: w.width)
+        : BoxConstraints.expand(height: w.width);
+    // We want the line to be w.width pixles wide.  If our parent is a row,
+    // we're a veritcal line, so our width needs to be fixed.
+    built = _wrapIfNeeded(
+        w,
+        Container(
+            constraints: constraints,
+            width: w.width,
+            height: w.width,
+            color: w.color));
+  }
+
+  @override
+  void visitSwitchArrow(config.ScreenSwitchArrow<Color, charts.Color> w) {
+    built = Expanded(
+        flex: w.flex,
+        child: Container(
+          constraints: BoxConstraints.expand(),
+          child: FittedBox(
+              fit: BoxFit.contain,
+              child: IconButton(
+                  icon: Icon(Icons.navigate_next),
+                  tooltip: 'Next Screen',
+                  color: w.color,
+                  onPressed: data.advanceScreen)),
+        ));
+  }
+
+  @override
+  void visitTimeChart(config.TimeChart<Color, charts.Color> w) {
+    final WindowedData<ChartData> deque = data.getDeque(w.dequeIndex);
+    assert(deque.windowSize == w.timeSpan);
+    built = TimeChart<ChartData>(
+        key: ObjectKey(w),
+        selector: _selectors[w.valueIndex],
+        label: w.label,
+        labelHeightFactor: w.labelHeightFactor,
+        numTicks: w.displayedTimeTicks,
+        minValue: w.minValue,
+        maxValue: w.maxValue,
+        graphColor: w.color,
+        data: deque);
+  }
+
+  @override
+  void visitValueBox(config.ValueBox<Color, charts.Color> w) {
+    built = ValueBox(
+        key: ObjectKey(w),
+        value: data.current?.displayedValues?.elementAt(w.valueIndex),
+        label: w.label,
+        labelHeightFactor: w.labelHeightFactor,
+        format: w.format,
+        alignment: w.alignment,
+        color: w.color,
+        units: w.units,
+        prefix: w.prefix,
+        postfix: w.postfix);
+  }
+
+  @override
+  void visitDataWidget(config.DataWidget<Color, charts.Color> w) {
+    w.displayer.accept(this);
+    built = _wrapIfNeeded(w, built);
   }
 }

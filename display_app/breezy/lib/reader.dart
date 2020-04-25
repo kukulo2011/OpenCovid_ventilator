@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show AssetBundle;
 import 'package:pedantic/pedantic.dart' show unawaited;
 import 'package:usb_serial/usb_serial.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
@@ -60,6 +59,7 @@ abstract class ByteStreamReader {
   StreamSubscription<String> _subscription;
   Completer<void> _subscriptionDone;
   void Function() _subscriptionOnDone;
+  Completer<void> _resetPending;
 
   ByteStreamReader(this.settings, this.listener);
 
@@ -89,7 +89,7 @@ abstract class ByteStreamReader {
     }
   }
 
-  Future<void> _readStream(Stream<Uint8List> stream, {void Function() onDone}) {
+  Future<void> _readStream(Stream<List<int>> stream, {void Function() onDone}) {
     _subscriptionDone = Completer<void>();
     _subscriptionOnDone = onDone;
     final done = _subscriptionDone.future;
@@ -145,6 +145,7 @@ abstract class ByteStreamReader {
       }
     } finally {
       _processingQueue = false;
+      _resetPending?.complete(null);
     }
   }
 
@@ -161,7 +162,14 @@ abstract class ByteStreamReader {
   }
 
   @mustCallSuper
-  Future<void> _reset() => listener.reset();
+  Future<void> _reset() async {
+    if (_processingQueue) {
+      _resetPending = Completer<void>();
+      await _resetPending.future;
+      _resetPending = null;
+    }
+    await listener.reset();
+  }
 }
 
 class SerialReader extends ByteStreamReader {
@@ -223,12 +231,43 @@ class SerialReader extends ByteStreamReader {
   }
 }
 
+class HttpReader extends ByteStreamReader {
+  HttpClient _client;
+  bool _shutDownClient;
+  final Uri uri;
+
+  HttpReader(
+      this._client, this.uri, Settings settings, StringStreamListener listener)
+      : super(settings, listener) {
+    _shutDownClient = _client == null;
+    if (_shutDownClient) {
+      _client = HttpClient();
+    }
+  }
+
+  @override
+  Future<void> start() async {
+    final req = await _client.getUrl(uri);
+    final Stream<List<int>> response = await req.close();
+    unawaited(_readStream(response, onDone: () {
+      unawaited(_reset());
+    }));
+  }
+
+  @override
+  void stop() {
+    super.stop();
+    if (_shutDownClient) {
+      _client.close();
+    }
+  }
+}
+
 class ServerSocketReader extends ByteStreamReader {
   ServerSocket _serverSocket;
   Socket _readingFrom;
 
-  ServerSocketReader(
-      Settings settings, StringStreamListener listener)
+  ServerSocketReader(Settings settings, StringStreamListener listener)
       : super(settings, listener);
 
   @override
@@ -238,8 +277,7 @@ class ServerSocketReader extends ByteStreamReader {
       return;
     }
     Log.writeln('Listening to port ${settings.socketPort}');
-    Log.writeln(
-        '    ${localAddresses.length} available network interface(s):');
+    Log.writeln('    ${localAddresses.length} available network interface(s):');
     for (final s in localAddresses) {
       Log.writeln('        $s');
     }
@@ -315,16 +353,18 @@ class ServerSocketReader extends ByteStreamReader {
 }
 
 class AssetFileReader extends ByteStreamReader {
-  AssetBundle _bundle;
   final BreezyConfiguration _config;
 
-  AssetFileReader(Settings settings, this._config, this._bundle,
+  AssetFileReader(Settings settings, this._config,
       StringStreamListener listener)
       : super(settings, listener);
 
   @override
   Future<void> start() async {
-    List<String> log = await _config.getSampleLog(_bundle);
+    List<String> log = await _config.getSampleLog();
+    if (log.isEmpty) {
+      throw Exception('Sample log is empty.');
+    }
     while (!stopped) {
       await _readStream(_makeStream(log));
       // Just keep time marching forward, while looping through the data.

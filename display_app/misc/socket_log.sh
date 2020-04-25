@@ -24,5 +24,6 @@ port=$3
 file=$4
 
 
-(echo "$security" ; cat $file; echo ""; echo "exit") | nc $host $port
+(echo "$security" ; echo "meter-data:on"; cat $file; echo ""; echo "exit") \
+        | nc $host $port
 

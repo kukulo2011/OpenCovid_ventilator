@@ -15,6 +15,7 @@ fi
 file=$1
 
 
+echo "meter-data:on" > /dev/rfcomm0
 cat $file > /dev/rfcomm0
 echo "reset-time" > /dev/rfcomm0
 

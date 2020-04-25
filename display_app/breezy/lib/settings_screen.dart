@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:pedantic/pedantic.dart';
-import 'configure.dart' show BreezyConfiguration;
+import 'configure_a.dart' show JsonBreezyConfiguration, DefaultBreezyConfiguration;
+import 'utils.dart';
 import 'main.dart'
-    show Settings, SettingsListener, InputSource, UUID, BreezyGlobals;
+    show
+        Settings,
+        SettingsListener,
+        InputSource,
+        BreezyGlobals,
+        showErrorDialog;
 import 'package:usb_serial/usb_serial.dart' show UsbSerial, UsbDevice;
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
     show BluetoothDevice;
@@ -52,6 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   final Settings settings;
   List<BluetoothDevice> _bluetoothClassicDevices;
   List<String> _configurations;
+  TextEditingController _httpUrlController;
   TextEditingController _socketPortController;
   TextEditingController _securityStringController;
 
@@ -72,13 +79,16 @@ class _SettingsScreenState extends State<SettingsScreen>
         _socketPortController.text = settings.socketPort.toString();
       }
     });
+    _httpUrlController = TextEditingController();
+    _httpUrlController.value =
+        _httpUrlController.value.copyWith(text: settings.httpUrl);
     _securityStringController = TextEditingController();
     _securityStringController.value =
         _securityStringController.value.copyWith(text: settings.securityString);
   }
 
   void _readConfigurations() {
-    _configurations = BreezyConfiguration.getStoredConfigurations();
+    _configurations = JsonBreezyConfiguration.getStoredConfigurations();
   }
 
   Future<void> initBluetooth() async {
@@ -98,14 +108,19 @@ class _SettingsScreenState extends State<SettingsScreen>
   void dispose() {
     super.dispose();
     settings.listeners.remove(this);
+    _socketPortController.dispose();
+    _securityStringController.dispose();
+    _httpUrlController.dispose();
+  }
+
+  void _getSettingsFromScreen() {
     String s = _securityStringController.text.trim();
     if (s != '') {
       settings.securityString = s;
     } else {
       settings.securityString = UUID.random().toString();
     }
-    _socketPortController.dispose();
-    _securityStringController.dispose();
+    settings.httpUrl = _httpUrlController.text.trim();
   }
 
   String deviceName(InputSource s) {
@@ -116,6 +131,8 @@ class _SettingsScreenState extends State<SettingsScreen>
         return 'Screen Debug Functions';
       case InputSource.sampleLog:
         return 'Demo Log Data';
+      case InputSource.http:
+        return 'Connection to URL';
       case InputSource.serverSocket:
         return 'Socket Connection to This Device';
       case InputSource.bluetoothClassic:
@@ -159,6 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           items: [
             InputSource.serial,
             InputSource.bluetoothClassic,
+            InputSource.http,
             InputSource.serverSocket,
             InputSource.sampleLog,
             InputSource.screenDebug
@@ -207,6 +225,18 @@ class _SettingsScreenState extends State<SettingsScreen>
         break;
       case InputSource.sampleLog:
         // Nothing special here
+        break;
+      case InputSource.http:
+        menuItems.add(Row(children: [
+          Text('http/https URL:'),
+          SizedBox(width: 16),
+          Expanded(
+              child: TextField(
+                  keyboardType: TextInputType.url,
+                  autocorrect: false,
+                  controller: _httpUrlController)),
+        ]));
+        meterIsMeaningful = true;
         break;
       case InputSource.serverSocket:
         menuItems.add(Row(children: [
@@ -260,19 +290,26 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
     if (meterIsMeaningful) {
       menuItems.add(CheckboxListTile(
-          title: const Text('Meter Incoming Data by Timestamp'),
+          title: const Text('Default to Meter Incoming Data by Timestamp'),
           value: settings.meterData,
           onChanged: (v) => settings.meterData = v,
           secondary: const Icon(Icons.access_time)));
     }
     return WillPopScope(
       onWillPop: () async {
+        _getSettingsFromScreen();
         await settings.write();
         final cn = settings.configurationName;
         if (cn != null) {
-          widget.globals.configuration = await BreezyConfiguration.read(cn);
+          try {
+            widget.globals.configuration = await JsonBreezyConfiguration.read(cn);
+          } catch (ex) {
+            await showErrorDialog(context, 'Error in configuration $cn', ex);
+            widget.globals.configuration = DefaultBreezyConfiguration.defaultConfig;
+            widget.globals.settings.configurationName = null;
+          }
         } else {
-          widget.globals.configuration = BreezyConfiguration.defaultConfig;
+          widget.globals.configuration = DefaultBreezyConfiguration.defaultConfig;
         }
         return true;
       },
@@ -305,7 +342,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 child: Text('Delete'),
                 onPressed: () {
                   setState(() {
-                    BreezyConfiguration.delete(settings.configurationName);
+                    JsonBreezyConfiguration.delete(settings.configurationName);
                     _readConfigurations();
                     settings.configurationName = null;
                   });

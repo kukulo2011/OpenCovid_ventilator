@@ -1,22 +1,12 @@
 import 'dart:convert';
 import 'dart:math' show min;
-import 'dart:io' show File, Directory, FileSystemEntity, IOSink, gzip;
-import 'package:path/path.dart' as path;
-import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' as material;
-import 'package:flutter/services.dart' show AssetBundle, ByteData;
+import 'dart:io' show IOSink, gzip;
+import 'package:meta/meta.dart';
 import 'package:archive/archive_io.dart' show Crc32;
-import 'package:quiver/core.dart' show hash3;
-import 'dart:ui' show Color;
+import 'package:quiver/core.dart' show hash2;
 import 'package:intl/intl.dart' show NumberFormat;
-import 'value_box.dart' as ui;
-import 'main.dart' show toHex;
-import 'rolling_chart.dart' as ui;
-import 'read_device.dart' show ChartData;
-import 'graphs_screen.dart' show HistoricalData;
-import 'deques.dart';
-import 'package:charts_flutter/flutter.dart' as charts;
+import 'utils.dart' show toHex;
+import 'data_types.dart';
 
 /*
 MIT License
@@ -45,27 +35,44 @@ SOFTWARE.
 //    cf. https://pub.dev/packages/receive_sharing_intent,
 //        https://stackoverflow.com/questions/4799576/register-a-new-file-type-in-android#4838863
 
-abstract class BreezyConfiguration {
-  static Directory localStorage;
-  final DataFeed feed;
+mixin _Commentable {
+  List<String> _comment;
+
+  void comment(String c) {
+    if (_comment == null) {
+      _comment = List<String>();
+    }
+    _comment.add(c);
+  }
+
+  Map<String, Object> withComment(bool stripComments, Map<String, Object> src) {
+    if (stripComments || _comment == null) {
+      return src;
+    } else {
+      final c = Map<String, Object>();
+      c['comment'] = _comment;
+      c.addAll(src);
+      return c;
+    }
+  }
+}
+
+/// A configuration for Breezy.  C is the type of a widget color
+/// (normally Color from dart:ui), and TC is the color type for a
+/// TimeChart (normally Color from package:charts_flutter/flutter.dart).
+/// The color types are abstracted out so that configurations can
+/// be created with desktop dart.  Sigh.
+abstract class BreezyConfiguration<C, TC> with _Commentable {
+  final DataFeed<C, TC> feed;
   final String name;
-  final List<Screen> screens;
-  Future<List<String>> getSampleLog(AssetBundle bundle);
+  final List<Screen<C, TC>> screens;
+  Future<List<String>> getSampleLog();
   Map<String, int> _screenNumByName;
 
   BreezyConfiguration(
       {@required this.name, @required this.feed, @required this.screens}) {
     assert(feed != null);
     assert(screens != null);
-  }
-
-  static BreezyConfiguration defaultConfig = _createDefault();
-
-  static BreezyConfiguration _createDefault() {
-    final feed = _defaultFeed();
-    final screens = Screen.defaultScreens(feed);
-    return _DefaultBreezyConfiguration(
-        name: null, screens: screens, feed: feed);
   }
 
   int getScreenNum(String name) {
@@ -82,38 +89,31 @@ abstract class BreezyConfiguration {
   /// with JsonEncoder.  This isn't truly needed in production, but it's the
   /// easiest way to make a sample JSON file from the default config.
   /// It's hooked into the server socket implementation.
-  Future<Map<String, Object>> toJson(AssetBundle bundle) async {
-    return {
+  Future<Map<String, Object>> toJson({bool stripComments = false}) async {
+    return withComment(stripComments, {
       'type': 'BreezyConfiguration',
-      'version': 1,
+      'version': 2,
       'name': name,
-      'feed': feed.toJson(),
-      'screens': screens.map((s) => s.toJson()).toList(growable: false),
-      'sampleLog': await getSampleLog(bundle)
-    };
+      'feed': feed.toJson(colorHelper, stripComments),
+      'screens': screens
+          .map((s) => s.toJson(colorHelper, stripComments))
+          .toList(growable: false),
+      'sampleLog': await getSampleLog()
+    });
   }
 
-  /// Throws various kinds of exceptions on malformed input
-  static BreezyConfiguration fromJson(Map<Object, Object> jsonSrc) {
-    final json = _JsonHelper(jsonSrc);
-    json.expect('type', 'BreezyConfiguration');
-    json.expect('version', 1);
-    return _JsonBreezyConfiguration(
-        name: json['name'] as String,
-        feed: json.decode('feed', DataFeed._fromJson),
-        screens: json.decodeList('screens', Screen._fromJson),
-        sampleLog: json.getList<String>('sampleLog'));
-  }
+  ColorHelper<C, TC> get colorHelper;
 
-  Future<void> writeJson(IOSink sink, AssetBundle bundle) async {
-    sink.writeln(JsonEncoder.withIndent('  ').convert(await toJson(bundle)));
+  Future<void> writeJson(IOSink sink) async {
+    final json = await toJson();
+    sink.writeln(JsonEncoder.withIndent('  ').convert(json));
     sink.writeln('');
   }
 
   /// Write out a compact representation, consisting of base64-encoded
   /// gzipped JSON, plus a Crc32 checksum.
-  Future<void> writeCompact(IOSink sink, AssetBundle bundle) async {
-    String str = JsonEncoder().convert(await toJson(bundle));
+  Future<void> writeCompact(IOSink sink) async {
+    String str = JsonEncoder().convert(await toJson(stripComments: true));
     List<int> bytes = utf8.encode(str);
     str = null;
     bytes = gzip.encoder.convert(bytes);
@@ -126,133 +126,16 @@ abstract class BreezyConfiguration {
       sink.writeln(str.substring(i, end));
     }
   }
-
-  Future<void> save() async {
-    final dir = await localStorage.create(recursive: true);
-    final f = File('${dir.path}/$name');
-    if (!await FileSystemEntity.identical(dir.path, f.parent.path)) {
-      throw Exception('Illegal file name in $name');
-    }
-    String str = JsonEncoder().convert(await toJson(null));
-    // Bundle is null in toJson, because there's no reason to ever
-    // write the default configuration to the filesystem.
-    List<int> bytes = utf8.encode(str);
-    str = null;
-    bytes = gzip.encoder.convert(bytes);
-    await f.writeAsBytes(bytes);
-  }
-
-  static Future<BreezyConfiguration> read(String name) async {
-    final f = File('${localStorage.path}/$name');
-    if (!await f.exists()) {
-      throw Exception('$f not found');
-    }
-    List<int> bytes = await f.readAsBytes();
-    bytes = gzip.decode(bytes);
-    String src = utf8.decode(bytes);
-    bytes = null;
-    final json = jsonDecode(src) as Map<Object, Object>;
-    src = null;
-    return BreezyConfiguration.fromJson(json);
-  }
-
-  static List<String> getStoredConfigurations() => localStorage
-      .listSync()
-      .map((FileSystemEntity f) => path.basename(f.path))
-      .toList(growable: false)
-        ..sort((s1, s2) => s1.toLowerCase().compareTo(s2.toLowerCase()));
-
-  static void delete(String name) =>
-    File('${localStorage.path}/$name').deleteSync();
 }
 
-class BreezyConfigurationJsonReader {
-  bool get done => _done;
-  bool _done = false;
-  final _source = StringBuffer();
-  final bool compact;
-  final int checksum;
+class BadConfigurationVersion implements Exception {
+  final String message;
 
-  BreezyConfigurationJsonReader({this.compact = false, this.checksum});
+  BadConfigurationVersion(this.message);
 
-  void acceptLine(String line) {
-    assert(!_done);
-    if (line == '') {
-      _done = true;
-      return;
-    }
-    _source.writeln(line);
-  }
-
-  BreezyConfiguration getResult() {
-    assert(_done);
-    String src;
-    if (compact) {
-      List<int> bytes = base64Decode(_source.toString());
-      _source.clear();
-      int c = (Crc32()..add(bytes)).hash;
-      if (checksum != c) {
-        throw ArgumentError('Crc32 checksum is $c, not expected $checksum');
-      }
-      bytes = gzip.decode(bytes);
-      src = utf8.decode(bytes);
-    } else {
-      assert(checksum == null);
-      src = _source.toString();
-      _source.clear();
-    }
-    final json = jsonDecode(src) as Map<Object, Object>;
-    _done = false;
-    src = null;
-    return BreezyConfiguration.fromJson(json);
-  }
-}
-
-class _JsonBreezyConfiguration extends BreezyConfiguration {
-  final List<String> _sampleLog;
-
-  _JsonBreezyConfiguration(
-      {@required String name,
-      @required DataFeed feed,
-      @required List<Screen> screens,
-      @required List<String> sampleLog})
-      : this._sampleLog = sampleLog,
-        super(name: name, feed: feed, screens: screens) {
-    assert(_sampleLog != null);
-  }
-
-  @override
-  Future<List<String>> getSampleLog(AssetBundle bundle) async {
-    return _sampleLog;
-  }
-}
-
-class _DefaultBreezyConfiguration extends BreezyConfiguration {
-  _DefaultBreezyConfiguration(
-      {@required String name,
-      @required DataFeed feed,
-      @required List<Screen> screens})
-      : super(name: name, feed: feed, screens: screens);
-
-  @override
-  Future<List<String>> getSampleLog(AssetBundle bundle) async {
-    final int _cr = '\r'.codeUnitAt(0);
-    final int _newline = '\n'.codeUnitAt(0);
-    ByteData d = await bundle.load('assets/demo.log');
-    final bytes = d.buffer.asUint8List(d.offsetInBytes, d.lengthInBytes);
-    final result = List<String>();
-    final lineBuffer = StringBuffer();
-    for (int ch in bytes) {
-      if (ch == _cr) {
-        // skip
-      } else if (ch == _newline) {
-        result.add(lineBuffer.toString());
-        lineBuffer.clear();
-      } else {
-        lineBuffer.writeCharCode(ch);
-      }
-    }
-    return result;
+  String toString() {
+    if (message == null) return "BadConfigurationException";
+    return "BadConfigurationException: $message";
   }
 }
 
@@ -260,28 +143,26 @@ class _DefaultBreezyConfiguration extends BreezyConfiguration {
 class _DequeSelector {
   final bool isRolling;
   final double timeSpan;
-  final int maxNumValues;
 
-  _DequeSelector(this.isRolling, this.timeSpan, this.maxNumValues);
+  _DequeSelector(this.isRolling, this.timeSpan);
 
   @override
   bool operator ==(Object o) =>
       o is _DequeSelector &&
       isRolling == o.isRolling &&
-      timeSpan == o.timeSpan &&
-      maxNumValues == o.maxNumValues;
+      timeSpan == o.timeSpan;
 
   @override
-  int get hashCode => hash3(isRolling, timeSpan, maxNumValues);
+  int get hashCode => hash2(isRolling, timeSpan);
 }
 
 /// A class to build up a deque index map, to map the characteristics
 /// of needed deques to their eventual indices in HistoricalData.
-class _DequeIndexMapper {
+class DequeIndexMapper {
   final dequeIndexMap = Map<_DequeSelector, int>();
 
-  int getDequeIndex(bool isRolling, double timeSpan, int maxNumValues) {
-    final sel = _DequeSelector(isRolling, timeSpan, maxNumValues);
+  int getDequeIndex(bool isRolling, double timeSpan) {
+    final sel = _DequeSelector(isRolling, timeSpan);
     final result = dequeIndexMap[sel];
     if (result != null) {
       return result;
@@ -293,13 +174,13 @@ class _DequeIndexMapper {
   }
 }
 
-class DataFeed {
+class DataFeed<C, TC> with _Commentable {
   final String protocolName;
   final int protocolVersion;
   final int timeModulus;
   final double ticksPerSecond;
-  final List<Value> chartedValues;
-  final List<Value> displayedValues;
+  final List<Value<C, TC>> chartedValues;
+  final List<Value<C, TC>> displayedValues;
   final Map<_DequeSelector, int> dequeIndexMap;
   final bool screenSwitchCommand;
   final bool checksumIsOptional;
@@ -315,19 +196,51 @@ class DataFeed {
       @required this.dequeIndexMap,
       @required this.screenSwitchCommand,
       @required this.checksumIsOptional,
-      @required this.numFeedValues});
+      @required this.numFeedValues}) {
+    final wasSeen = Set<Value>();
+    final feedIndexSeen = List<bool>.filled(numFeedValues, false);
+    for (int i = 0; i < chartedValues.length; i++) {
+      final v = chartedValues[i];
+      wasSeen.add(v);
+      assert (!feedIndexSeen[v.feedIndex]);
+      feedIndexSeen[v.feedIndex] = true;
+      for (final d in v.displayers) {
+        if (d is TimeChart) {
+          final tc = d as TimeChart;
+          assert(tc._valueIndex == null);
+          tc._valueIndex = i;
+        }
+      }
+    }
+    for (int i = 0; i < displayedValues.length; i++) {
+      final v = displayedValues[i];
+      if (!wasSeen.contains(v)) {
+        wasSeen.add(v);
+        assert (!feedIndexSeen[v.feedIndex]);
+        feedIndexSeen[v.feedIndex] = true;
+      }
+      for (final d in v.displayers) {
+        if (d is ValueBox) {
+          final vb = d as ValueBox;
+          assert(vb._valueIndex == null);
+          vb._valueIndex = i;
+        }
+      }
+    }
 
-  Map<String, Object> toJson() {
-    final values = List<Value>(numFeedValues);
+  }
+
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) {
+    final values = List<Map<String, Object>>(numFeedValues);
     for (final v in chartedValues) {
-      values[v.feedIndex] = v;
+      values[v.feedIndex] = v.toJson(helper, stripComments);
     }
     for (final v in displayedValues) {
-      values[v.feedIndex] = v;
+      values[v.feedIndex] = v.toJson(helper, stripComments);
       // It's OK if it appears in both lists
     }
     assert(!values.any((v) => v == null));
-    return {
+    return withComment(stripComments, {
       'type': 'DataFeed',
       'protocolName': protocolName,
       'protocolVersion': protocolVersion,
@@ -336,41 +249,42 @@ class DataFeed {
       'values': values,
       'screenSwitchCommand': screenSwitchCommand,
       'checksumIsOptional': checksumIsOptional
-    };
+    });
   }
 
-  static DataFeed _fromJson(_JsonHelper json) {
+  static DataFeed<C, TC> fromJson<C, TC>(JsonHelper<C, TC> json) {
     json.expect('type', 'DataFeed');
     final valueIndex = _ValueIndex();
-    Value makeValue(_JsonHelper json, int index) {
+    Value<C, TC> makeValue(JsonHelper<C, TC> json, int index) {
       return Value._fromJson(json, valueIndex, index);
     }
 
     final values = json.decodeList('values', makeValue);
-    final chartedValues = List<Value>(valueIndex.charted.length);
-    final displayedValues = List<Value>(valueIndex.displayed.length);
+    final chartedValues = List<Value<C, TC>>(valueIndex.charted.length);
+    final displayedValues = List<Value<C, TC>>(valueIndex.displayed.length);
     for (final v in values) {
-      int i = valueIndex.charted[v];
-      if (i != null) {
-        chartedValues[i] = v;
+      final int ci = valueIndex.charted[v];
+      if (ci != null) {
+        chartedValues[ci] = v;
       }
-      i = valueIndex.displayed[v];
-      if (i != null) {
-        displayedValues[valueIndex.displayed[v]] = v;
+      final int vi = valueIndex.displayed[v];
+      if (vi != null) {
+        displayedValues[vi] = v;
       }
+      assert(ci != null || vi != null);
     }
     assert(!chartedValues.any((v) => v == null));
     assert(!displayedValues.any((v) => v == null));
-    return DataFeed(
+    return DataFeed<C, TC>(
         protocolName: json['protocolName'] as String,
         protocolVersion: json['protocolVersion'] as int,
-        timeModulus: json['timeModulus'] as int,
+        timeModulus: json.getOrNull('timeModulus') as int,
         ticksPerSecond: (json['ticksPerSecond'] as num).toDouble(),
         chartedValues: chartedValues,
         displayedValues: displayedValues,
         dequeIndexMap: json.dequeIndexMapper.dequeIndexMap,
         screenSwitchCommand: json['screenSwitchCommand'] as bool,
-        checksumIsOptional: json['screenSwitchCommand'] as bool,
+        checksumIsOptional: json['checksumIsOptional'] as bool,
         numFeedValues: values.length);
     // Thats one for "breezy", one for the version #, one for time,
     // one for the checksum, and one for the screen switch command, if present.
@@ -380,10 +294,10 @@ class DataFeed {
     final result = List<WindowedData<ChartData>>(dequeIndexMap.length);
     dequeIndexMap.forEach((sel, i) {
       if (sel.isRolling) {
-        result[i] = RollingDeque<ChartData>(sel.maxNumValues + 1, sel.timeSpan,
+        result[i] = RollingDeque<ChartData>(sel.timeSpan,
             sel.timeSpan / 20, (double time) => ChartData.dummy(time));
       } else {
-        result[i] = SlidingDeque<ChartData>(sel.maxNumValues, sel.timeSpan);
+        result[i] = SlidingDeque<ChartData>(sel.timeSpan);
       }
     });
     return result;
@@ -395,10 +309,10 @@ class _ValueIndex {
   final displayed = Map<Value, int>();
 }
 
-class Value {
+class Value<C, TC> with _Commentable {
   final double demoMinValue;
   final double demoMaxValue;
-  final List<DataDisplayer> displayers;
+  final List<DataDisplayer<C, TC>> displayers;
   final int feedIndex;
 
   Value(
@@ -407,34 +321,81 @@ class Value {
       @required this.displayers,
       @required this.feedIndex});
 
-  Map<String, Object> toJson() => {
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) =>
+      withComment(stripComments, {
         'type': 'Value',
         'demoMinValue': demoMinValue,
         'demoMaxValue': demoMaxValue,
-        'displayers': displayers.map((d) => d.toJson()).toList(growable: false)
-      };
+        'displayers': displayers
+            .map((d) => d.toJson(helper, stripComments))
+            .toList(growable: false)
+      });
 
   String formatValue(double value) => '$value';
 
-  String formatFeedValue(String value) => value;
+  /// Format a string value for a feed:
+  ///    \\ becomes \
+  ///    \c becomes ,
+  ///    \n becomes newline
+  /// This lets us have commas and newlines in string values in the feed.
+  String formatFeedValue(String value) {
+    if (!value.contains('\\')) {
+      return value;
+    }
 
-  static Value _fromJson(
-      _JsonHelper json, _ValueIndex valueIndex, int feedIndex) {
+    final backslash = '\\'.codeUnitAt(0);
+    final letterC = 'c'.codeUnitAt(0);
+    final letterN  = 'n'.codeUnitAt(0);
+    final result = StringBuffer();
+    bool backslashSeen = false;
+    for (final ch in value.codeUnits) {
+      if (backslashSeen) {
+        if (ch == letterC) {
+          backslashSeen = false;
+          result.write(',');
+          continue;
+        } else if (ch == letterN) {
+          backslashSeen = false;
+          result.write('\n');
+          continue;
+        } else if (ch == backslash) {
+          backslashSeen = false;
+          result.writeCharCode(backslash);
+          continue;
+        } else {
+          result.writeCharCode(backslash);
+          // And fall through...
+        }
+      }
+      backslashSeen = ch == backslash;
+      if (!backslashSeen) {
+        result.writeCharCode(ch);
+      }
+    }
+    if (backslashSeen) {
+      result.writeCharCode(backslash);
+    }
+    return result.toString();
+  }
+
+  static Value<C, TC> _fromJson<C, TC>(
+      JsonHelper<C, TC> json, _ValueIndex valueIndex, int feedIndex) {
     final type = json['type'] as String;
     final demoMinValue = (json['demoMinValue'] as num).toDouble();
     final demoMaxValue = (json['demoMaxValue'] as num).toDouble();
-    final displayers = List<DataDisplayer>((json['displayers'] as List).length);
-    Value v;
+    final displayers =
+        List<DataDisplayer<C, TC>>((json['displayers'] as List).length);
+    Value<C, TC> v;
     switch (type) {
       case 'Value':
-        v = Value(
+        v = Value<C, TC>(
             demoMinValue: demoMinValue,
             demoMaxValue: demoMaxValue,
             displayers: displayers,
             feedIndex: feedIndex);
         break;
       case 'FormattedValue':
-        v = FormattedValue(
+        v = FormattedValue<C, TC>(
             format: json['format'] as String,
             keepOriginalFormat: json['keepOriginalFormat'] as bool,
             demoMinValue: demoMinValue,
@@ -443,7 +404,7 @@ class Value {
             feedIndex: feedIndex);
         break;
       case 'RatioValue':
-        v = RatioValue(
+        v = RatioValue<C, TC>(
             format: json['format'] as String,
             keepOriginalFormat: json['keepOriginalFormat'] as bool,
             demoMinValue: demoMinValue,
@@ -454,12 +415,20 @@ class Value {
       default:
         throw ArgumentError('Unknown value type:  $type');
     }
-    DataDisplayer makeDisplayer(_JsonHelper json, int index) {
-      return DataDisplayer._fromJson(json, v, valueIndex);
+    DataDisplayer<C, TC> makeDisplayer(JsonHelper<C, TC> json, int index) {
+      return DataDisplayer._fromJson<C, TC>(json, v, valueIndex);
     }
 
     final nd = json.decodeList('displayers', makeDisplayer);
     assert(nd.length == displayers.length);
+    if (nd.isEmpty) {
+      // A value with no displayers.  We put it in displayedValues, so that
+      // the feed gets read and validated, and so that we don't need any
+      // special cases.
+      assert(valueIndex.charted[v] == null);
+      assert(valueIndex.displayed[v] == null);
+      valueIndex.displayed[v] = valueIndex.displayed.length;
+    }
     for (int i = 0; i < nd.length; i++) {
       v.displayers[i] = nd[i];
     }
@@ -467,7 +436,7 @@ class Value {
   }
 }
 
-class FormattedValue extends Value {
+class FormattedValue<C, TC> extends Value<C, TC> {
   final NumberFormat format;
   final String _formatPattern;
   final bool keepOriginalFormat;
@@ -477,7 +446,7 @@ class FormattedValue extends Value {
       @required this.keepOriginalFormat,
       @required double demoMinValue,
       @required double demoMaxValue,
-      @required List<DataDisplayer> displayers,
+      @required List<DataDisplayer<C, TC>> displayers,
       @required int feedIndex})
       : this.format = NumberFormat(format),
         this._formatPattern = format,
@@ -492,28 +461,31 @@ class FormattedValue extends Value {
 
   @override
   String formatFeedValue(String value) => keepOriginalFormat
-      ? value
+      ? super.formatFeedValue(value)
       : formatValue(double.tryParse(value) ?? double.nan);
 
   String get _jsonTypeName => 'FormattedValue';
 
-  Map<String, Object> toJson() => {
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) =>
+      withComment(stripComments, {
         'type': _jsonTypeName,
         'format': _formatPattern,
         'keepOriginalFormat': keepOriginalFormat,
         'demoMinValue': demoMinValue,
         'demoMaxValue': demoMaxValue,
-        'displayers': displayers.map((d) => d.toJson()).toList(growable: false),
-      };
+        'displayers': displayers
+            .map((d) => d.toJson(helper, stripComments))
+            .toList(growable: false),
+      });
 }
 
-class RatioValue extends FormattedValue {
+class RatioValue<C, TC> extends FormattedValue<C, TC> {
   RatioValue(
       {@required String format,
       @required bool keepOriginalFormat,
       @required double demoMinValue,
       @required double demoMaxValue,
-      @required List<DataDisplayer> displayers,
+      @required List<DataDisplayer<C, TC>> displayers,
       @required int feedIndex})
       : super(
             format: format,
@@ -535,26 +507,20 @@ class RatioValue extends FormattedValue {
   String get _jsonTypeName => 'RatioValue';
 }
 
-class Screen {
-  static List<Screen> defaultScreens(DataFeed feed) {
-    final result = [_defaultScreen(feed)];
-    for (final s in result) {
-      s.init();
-    }
-    return result;
-  }
-
+class Screen<C, TC> with _Commentable {
   final String name;
   final ScreenContainer portrait;
   final ScreenContainer landscape;
 
   Screen(
       {@required this.name,
-      @required this.portrait,
-      @required this.landscape}) {
-    assert(name != null);
-    assert(portrait != null);
-    assert(landscape != null);
+      @required ScreenContainer portrait,
+      ScreenContainer landscape})
+      : this.portrait = (portrait == null) ? landscape : portrait,
+        this.landscape = (landscape == null) ? portrait : landscape {
+    assert(this.name != null);
+    assert(this.portrait != null);
+    assert(this.landscape != null);
   }
 
   void init() {
@@ -564,30 +530,28 @@ class Screen {
     }
   }
 
-  Map<String, Object> toJson() {
-    return {
-      'type': 'Screen',
-      'name': name,
-      'portrait': portrait.toJson(),
-      'landscape': (portrait == landscape) ? null : landscape.toJson(),
-    };
-  }
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) =>
+      withComment(stripComments, {
+        'type': 'Screen',
+        'name': name,
+        'portrait': portrait.toJson(helper, stripComments),
+        'landscape': (portrait == landscape)
+            ? null
+            : landscape.toJson(helper, stripComments),
+      });
 
-  static Screen _fromJson(_JsonHelper json, int index) {
+  static Screen<C, TC> fromJson<C, TC>(JsonHelper<C, TC> json, int index) {
     json.expect('type', 'Screen');
     var portrait = (json.getOrNull('portrait') == null)
         ? null
         : json.decode('portrait', ScreenWidget._fromJson) as ScreenContainer;
     final landscape = (json.getOrNull('landscape') == null)
-        ? portrait
+        ? null
         : json.decode('landscape', ScreenWidget._fromJson) as ScreenContainer;
-    if (landscape == null) {
+    if (landscape == null && portrait == null) {
       throw ArgumentError('No portrait or landscape screen layout.');
     }
-    if (portrait == null) {
-      portrait = landscape;
-    }
-    return Screen(
+    return Screen<C, TC>(
       name: json['name'] as String,
       portrait: portrait,
       landscape: landscape,
@@ -595,16 +559,17 @@ class Screen {
   }
 }
 
-abstract class DataDisplayer {
+abstract class DataDisplayer<C, TC> with _Commentable {
   final String id;
 
   DataDisplayer(this.id);
 
-  Map<String, Object> toJson();
-  material.Widget build(HistoricalData data);
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments);
 
-  static DataDisplayer _fromJson(
-      _JsonHelper json, Value value, _ValueIndex valueIndex) {
+  void accept(ScreenWidgetVisitor<C, TC> v);
+
+  static DataDisplayer<C, TC> _fromJson<C, TC>(
+      JsonHelper<C, TC> json, Value<C, TC> value, _ValueIndex valueIndex) {
     int indexFor(Value v, Map<Value, int> index) {
       int i = index[v];
       if (i == null) {
@@ -616,92 +581,93 @@ abstract class DataDisplayer {
 
     final type = json['type'];
     if (type == 'TimeChart') {
-      return TimeChart._fromJson(json, indexFor(value, valueIndex.charted));
+      return TimeChart._fromJson<C, TC>(
+          json, indexFor(value, valueIndex.charted));
     } else if (type == 'ValueBox') {
-      return ValueBox._fromJson(json, indexFor(value, valueIndex.displayed));
+      return ValueBox._fromJson<C, TC>(
+          json, indexFor(value, valueIndex.displayed));
     } else {
       throw ArgumentError('Bad DataDisplayer type $type');
     }
   }
 }
 
-class ValueBox extends DataDisplayer {
-  final int _valueIndex;
+class ValueBox<C, TC> extends DataDisplayer<C, TC> {
+  int _valueIndex;
+  int get valueIndex {
+    assert(_valueIndex != null);
+    return _valueIndex;
+  }
+
   final String label;
   final double labelHeightFactor;
   final String units;
   final String format;
-  final Color color;
+  final ValueAlignment alignment;
+  final C color;
   final String prefix;
   final String postfix;
   ValueBox(
       {@required String id,
-      @required int valueIndex,
       @required this.label,
       @required this.labelHeightFactor,
       @required this.units,
       @required this.format,
       @required this.color,
+      this.alignment = ValueAlignment.decimal,
       this.prefix,
       this.postfix})
-      : this._valueIndex = valueIndex,
-        super(id) {
-    assert(_valueIndex != null);
-  }
+      : super(id);
 
-  @override
-  material.Widget build(HistoricalData data) => ui.ValueBox(
-      value: data.current?.displayedValues?.elementAt(_valueIndex),
-      label: label,
-      labelHeightFactor: labelHeightFactor,
-      format: format,
-      color: color,
-      units: units,
-      prefix: prefix,
-      postfix: postfix);
-
-  Map<String, Object> toJson() => {
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) =>
+      withComment(stripComments, {
         'type': 'ValueBox',
         'id': id,
         'label': label,
         'labelHeightFactor': labelHeightFactor,
         'units': units,
         'format': format,
-        'color': _encodeColor(color),
+        'alignment': JsonHelper.enumName(alignment),
+        'color': helper.encodeColor(color),
         'prefix': prefix,
         'postfix': postfix
-      };
+      });
 
-  static ValueBox _fromJson(_JsonHelper json, int index) {
+  static ValueBox<C, TC> _fromJson<C, TC>(JsonHelper<C, TC> json, int index) {
     assert(json['type'] == 'ValueBox');
-    final vb = ValueBox(
+    final ValueBox<C, TC> vb = ValueBox<C, TC>(
         id: json['id'] as String,
-        valueIndex: index,
         label: json['label'] as String,
         labelHeightFactor: (json['labelHeightFactor'] as num).toDouble(),
         units: json.getOrNull('units') as String,
         format: json['format'] as String,
+        alignment: json.getAlignment('alignment'),
         color: json.getColor('color'),
         prefix: json.getOrNull('prefix') as String,
         postfix: json.getOrNull('postfix') as String);
     json.registerDisplayer(vb);
     return vb;
   }
+
+  @override
+  void accept(ScreenWidgetVisitor v) => v.visitValueBox(this);
 }
 
-class TimeChart extends DataDisplayer
-    implements ui.TimeChartSelector<ChartData> {
+class TimeChart<C, TC> extends DataDisplayer<C, TC> {
   final bool rolling;
   final double minValue;
   final double maxValue;
   final double timeSpan;
-  final int maxNumValues;
   final int displayedTimeTicks;
-  final charts.Color color;
+  final TC color;
   final String label;
   final double labelHeightFactor;
-  final int _dequeIndex;
-  final int _valueIndex;
+  final int dequeIndex;
+  int _valueIndex;
+  int get valueIndex {
+    assert(_valueIndex != null);
+    return _valueIndex;
+  }
 
   TimeChart(
       {@required String id,
@@ -709,612 +675,308 @@ class TimeChart extends DataDisplayer
       @required this.minValue,
       @required this.maxValue,
       @required this.timeSpan,
-      @required this.maxNumValues,
       @required this.displayedTimeTicks,
       @required this.color,
       @required this.label,
       @required this.labelHeightFactor,
-      @required int valueIndex,
-      @required _DequeIndexMapper mapper})
-      : _valueIndex = valueIndex,
-        _dequeIndex = mapper.getDequeIndex(rolling, timeSpan, maxNumValues),
-        super(id);
-
-  material.Widget build(HistoricalData data) {
-    final WindowedData<ChartData> deque = data.getDeque(_dequeIndex);
-    assert(deque.windowSize == timeSpan);
-    return ui.TimeChart<ChartData>(
-        selector: this,
-        label: label,
-        labelHeightFactor: labelHeightFactor,
-        numTicks: displayedTimeTicks,
-        minValue: minValue,
-        maxValue: maxValue,
-        graphColor: color,
-        data: deque);
+      @required DequeIndexMapper mapper})
+      : dequeIndex = mapper.getDequeIndex(rolling, timeSpan),
+        super(id) {
+    assert(this.color != null);
   }
 
-  @override
-  double getValue(ChartData data) => data.values?.elementAt(_valueIndex);
-
-  Map<String, Object> toJson() => {
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) =>
+      withComment(stripComments, {
         'type': 'TimeChart',
         'id': id,
         'rolling': rolling,
         'minValue': minValue,
         'maxValue': maxValue,
         'timeSpan': timeSpan,
-        'maxNumValues': maxNumValues,
         'displayedTimeTicks': displayedTimeTicks,
-        'color': color.rgbaHexString,
+        'color': helper.encodeChartColor(color),
         'label': label,
         'labelHeightFactor': labelHeightFactor
-      };
+      });
 
-  static TimeChart _fromJson(_JsonHelper json, int index) {
+  static TimeChart<C, TC> _fromJson<C, TC>(JsonHelper<C, TC> json, int index) {
     assert(json['type'] == 'TimeChart');
-    final tc = TimeChart(
+    final tc = TimeChart<C, TC>(
         id: json['id'] as String,
         rolling: json['rolling'] as bool,
         minValue: (json['minValue'] as num).toDouble(),
         maxValue: (json['maxValue'] as num).toDouble(),
         timeSpan: (json['timeSpan'] as num).toDouble(),
-        maxNumValues: json['maxNumValues'] as int,
         displayedTimeTicks: json['displayedTimeTicks'] as int,
-        color: charts.Color.fromHex(code: json['color'] as String),
+        color: json.getChartColor('color'),
         label: json['label'] as String,
         labelHeightFactor: (json['labelHeightFactor'] as num).toDouble(),
-        valueIndex: index,
         mapper: json.dequeIndexMapper);
     json.registerDisplayer(tc);
     return tc;
   }
+
+  @override
+  void accept(ScreenWidgetVisitor v) => v.visitTimeChart(this);
 }
 
-abstract class ScreenWidget {
+abstract class ScreenWidgetVisitor<C, TC> {
+  void visitColumn(ScreenColumn<C, TC> w);
+  void visitRow(ScreenRow<C, TC> w);
+  void visitSpacer(Spacer<C, TC> w);
+  void visitBorder(Border<C, TC> w);
+  void visitLabel(Label<C, TC> w);
+  void visitSwitchArrow(ScreenSwitchArrow<C, TC> w);
+  void visitDataWidget(DataWidget<C, TC> w);
+  void visitTimeChart(TimeChart<C, TC> w);
+  void visitValueBox(ValueBox<C, TC> w);
+}
+
+abstract class ScreenWidget<C, TC> with _Commentable {
   /// Defaults to 1.  Ignored for root node.
   final int flex;
   bool hasParent = true;
+  bool parentIsRow;
 
   ScreenWidget(this.flex);
 
   /// [parent] is the row or column that contains us, or null if we're
   @mustCallSuper
-  void init(ScreenContainer parent) {
+  void init(ScreenContainer<C, TC> parent) {
     hasParent = parent != null;
+    parentIsRow = parent is ScreenRow<C, TC>;
+    assert(parentIsRow || !hasParent || parent is ScreenColumn<C, TC>);
   }
 
-  /// at the top of the tree.  [data] is the data to be rendered.
-  material.Widget build(HistoricalData data);
+  void accept(ScreenWidgetVisitor<C, TC> v);
 
-  material.Widget _wrapIfNeeded(material.Widget w) {
-    if (hasParent) {
-      return material.Expanded(flex: flex, child: w);
-    } else {
-      return w;
-    }
-  }
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments);
 
-  Map<String, Object> toJson();
-
-  static ScreenWidget _fromJson(_JsonHelper json) {
+  static ScreenWidget<C, TC> _fromJson<C, TC>(JsonHelper<C, TC> json) {
     switch (json['type'] as String) {
       case 'ScreenColumn':
-        return ScreenColumn(
+        return ScreenColumn<C, TC>(
             flex: json['flex'] as int,
             content: json.decodeList('content', ScreenWidget._fromJsonInList));
       case 'ScreenRow':
-        return ScreenRow(
+        return ScreenRow<C, TC>(
             flex: json['flex'] as int,
             content: json.decodeList('content', ScreenWidget._fromJsonInList));
       case 'Spacer':
-        return Spacer(json['flex'] as int);
+        return Spacer<C, TC>(json['flex'] as int);
+      case 'Border':
+        return Border<C, TC>(
+            width: (json['width'] as num).toDouble(),
+            color: json.getColor('color'),
+            flex: json.getOrNull('flex') as int);
       case 'ScreenSwitchArrow':
-        return ScreenSwitchArrow(
+        return ScreenSwitchArrow<C, TC>(
             flex: json['flex'] as int, color: json.getColor('color'));
       case 'Label':
-        return Label(
+        return Label<C, TC>(
             flex: json['flex'] as int,
             text: json['text'] as String,
             color: json.getColor('color'));
       case 'DataWidget':
-        return DataWidget(
+        return DataWidget<C, TC>(
             flex: json['flex'] as int, displayer: json.findDisplayer('dataID'));
     }
     throw ArgumentError('Unexpected type ${json['type']}');
   }
 
-  static ScreenWidget _fromJsonInList(_JsonHelper json, int index) =>
+  static ScreenWidget<C, TC> _fromJsonInList<C, TC>(
+          JsonHelper<C, TC> json, int index) =>
       _fromJson(json);
 }
 
-class Spacer extends ScreenWidget {
+class Spacer<C, TC> extends ScreenWidget<C, TC> {
   Spacer(int flex) : super(flex);
 
   @override
-  material.Widget build(HistoricalData data) {
-    return material.Spacer(flex: flex);
-  }
+  void accept(ScreenWidgetVisitor<C, TC> v) => v.visitSpacer(this);
 
   @override
-  Map<String, Object> toJson() => {'type': 'Spacer', 'flex': flex};
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) =>
+      withComment(stripComments, {'type': 'Spacer', 'flex': flex});
 }
 
-class ScreenSwitchArrow extends ScreenWidget {
-  final Color color;
+
+class Border<C, TC> extends ScreenWidget<C, TC> {
+  C color;
+  double width;
+
+  /// A border.  flex is usually left null; if set, it means the
+  /// width of the border will expand to fill available space according
+  /// to flex.
+  Border({@required this.color, this.width=1, int flex}) : super(flex);
+
+  @override
+  void accept(ScreenWidgetVisitor<C, TC> v) => v.visitBorder(this);
+
+  @override
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) =>
+      withComment(stripComments, {'type': 'Border', 'width': width,
+        'color': helper.encodeColor(color),
+      'flex': flex});
+}
+
+class ScreenSwitchArrow<C, TC> extends ScreenWidget<C, TC> {
+  final C color;
 
   ScreenSwitchArrow({int flex = 1, @required this.color}) : super(flex);
 
   @override
-  material.Widget build(HistoricalData data) {
-    return material.Expanded(
-      child: material.FittedBox(
-          fit: material.BoxFit.contain,
-          child: material.IconButton(
-              icon: material.Icon(material.Icons.navigate_next),
-              tooltip: 'Next Screen',
-              color: color,
-              onPressed: data.advanceScreen)),
-    );
-  }
+  void accept(ScreenWidgetVisitor<C, TC> v) => v.visitSwitchArrow(this);
 
   @override
-  Map<String, Object> toJson() =>
-      {'type': 'ScreenSwitchArrow', 'flex': flex, 'color': _encodeColor(color)};
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) =>
+      withComment(stripComments, {
+        'type': 'ScreenSwitchArrow',
+        'flex': flex,
+        'color': helper.encodeColor(color)
+      });
 }
 
-class Label extends ScreenWidget {
+class Label<C, TC> extends ScreenWidget<C, TC> {
   final String text;
-  final Color color;
+  final C color;
 
-  Label({@required int flex, @required this.text, @required this.color})
+  Label({int flex = 1, @required this.text, @required this.color})
       : super(flex);
 
-  material.Widget build(HistoricalData data) => _wrapIfNeeded(
-      material.Text(text, style: material.TextStyle(color: color)));
+  @override
+  void accept(ScreenWidgetVisitor<C, TC> v) => v.visitLabel(this);
 
   @override
-  Map<String, Object> toJson() => {
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) =>
+      withComment(stripComments, {
         'type': 'Label',
         'text': text,
-        'color': _encodeColor(color),
+        'color': helper.encodeColor(color),
         'flex': flex
-      };
+      });
 }
 
-abstract class ScreenContainer extends ScreenWidget {
-  final List<ScreenWidget> content;
-  ScreenContainer({@required int flex, @required this.content}) : super(flex);
+abstract class ScreenContainer<C, TC> extends ScreenWidget<C, TC> {
+  final List<ScreenWidget<C, TC>> content;
+  ScreenContainer({int flex=1, @required this.content}) : super(flex);
 
   String get _jsonTypeName;
 
   @override
-  void init(ScreenContainer parent) {
+  void init(ScreenContainer<C, TC> parent) {
     super.init(parent);
     for (final c in content) {
       c.init(this);
     }
   }
 
-  List<material.Widget> _buildChildren(HistoricalData data) {
-    final result = List<material.Widget>(content.length);
-    for (int i = 0; i < content.length; i++) {
-      result[i] = content[i].build(data);
+  @override
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) =>
+      withComment(stripComments, {
+        'type': _jsonTypeName,
+        'content': content
+            .map((w) => w.toJson(helper, stripComments))
+            .toList(growable: false),
+        'flex': flex
+      });
+}
+
+class ScreenColumn<C, TC> extends ScreenContainer<C, TC> {
+  ScreenColumn({int flex = 1, @required List<ScreenWidget<C, TC>> content})
+      : super(flex: flex, content: content) {
+    for (final w in content) {
+      assert (!(w is ScreenColumn));
     }
-    return result;
   }
 
   @override
-  Map<String, Object> toJson() => {
-        'type': _jsonTypeName,
-        'content': content.map((w) => w.toJson()).toList(growable: false),
-        'flex': flex
-      };
-}
-
-class ScreenColumn extends ScreenContainer {
-  ScreenColumn({int flex = 1, @required List<ScreenWidget> content})
-      : super(flex: flex, content: content);
+  void accept(ScreenWidgetVisitor v) => v.visitColumn(this);
 
   @override
-  void init(ScreenContainer parent) {
+  void init(ScreenContainer<C, TC> parent) {
     super.init(parent);
     if (parent is ScreenColumn) {
       throw Exception("A column can't contain another column");
     }
   }
 
-  material.Widget build(HistoricalData data) =>
-      _wrapIfNeeded(material.Column(children: _buildChildren(data)));
-
   @override
   String get _jsonTypeName => 'ScreenColumn';
 }
 
-class ScreenRow extends ScreenContainer {
-  ScreenRow({int flex = 1, @required List<ScreenWidget> content})
-      : super(flex: flex, content: content);
+class ScreenRow<C, TC> extends ScreenContainer<C, TC> {
+  ScreenRow({int flex = 1, @required List<ScreenWidget<C, TC>> content})
+      : super(flex: flex, content: content) {
+    for (final w in content) {
+      assert (!(w is ScreenRow));
+    }
+  }
 
   @override
-  void init(ScreenContainer parent) {
+  void init(ScreenContainer<C, TC> parent) {
     super.init(parent);
     if (parent is ScreenRow) {
       throw Exception("A row can't contain another row");
     }
   }
 
-  material.Widget build(HistoricalData data) =>
-      _wrapIfNeeded(material.Row(children: _buildChildren(data)));
+  @override
+  void accept(ScreenWidgetVisitor<C, TC> v) => v.visitRow(this);
 
   @override
   String get _jsonTypeName => 'ScreenRow';
 }
 
-class DataWidget extends ScreenWidget {
-  final DataDisplayer displayer;
+class DataWidget<C, TC> extends ScreenWidget<C, TC> {
+  final DataDisplayer<C, TC> displayer;
 
   DataWidget({int flex = 1, @required this.displayer}) : super(flex);
 
   @override
-  material.Widget build(HistoricalData data) {
-    return _wrapIfNeeded(displayer.build(data));
-  }
+  void accept(ScreenWidgetVisitor v) => v.visitDataWidget(this);
 
   @override
-  Map<String, Object> toJson() =>
-      {'type': 'DataWidget', 'dataID': displayer.id, 'flex': flex};
+  Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) =>
+      withComment(stripComments,
+          {'type': 'DataWidget', 'dataID': displayer.id, 'flex': flex});
 }
 
-DataFeed _defaultFeed() {
-  final mapper = _DequeIndexMapper();
-  final labelHeight = 0.24;
-  return DataFeed(
-      protocolName: 'breezy',
-      protocolVersion: 1,
-      timeModulus: 0x10000,
-      ticksPerSecond: 1000.0,
-      numFeedValues: 14,
-      screenSwitchCommand: false,
-      checksumIsOptional: true,
-      chartedValues: [
-        Value(
-          feedIndex: 0,
-          demoMinValue: -10,
-          demoMaxValue: 50,
-          displayers: [
-            TimeChart(
-                id: 'c:pressure',
-                valueIndex: 0,
-                color: charts.MaterialPalette.deepOrange.shadeDefault.lighter,
-                displayedTimeTicks: 11,
-                timeSpan: 10,
-                maxNumValues: 500,
-                label: 'PRESSURE cmH2O',
-                labelHeightFactor: labelHeight / 2,
-                minValue: -10.0,
-                maxValue: 50.0,
-                mapper: mapper)
-          ],
-        ),
-        Value(
-          feedIndex: 1,
-          demoMinValue: -100,
-          demoMaxValue: 100,
-          displayers: [
-            TimeChart(
-                id: 'c:flow',
-                valueIndex: 1,
-                color: charts.MaterialPalette.green.shadeDefault.lighter,
-                displayedTimeTicks: 11,
-                timeSpan: 10,
-                maxNumValues: 500,
-                label: 'FLOW l/min',
-                labelHeightFactor: labelHeight / 2,
-                minValue: -100.0,
-                maxValue: 100.0,
-                mapper: mapper)
-          ],
-        ),
-        Value(
-          feedIndex: 2,
-          demoMinValue: 0,
-          demoMaxValue: 800,
-          displayers: [
-            TimeChart(
-                id: 'c:volume',
-                valueIndex: 2,
-                color: charts.MaterialPalette.blue.shadeDefault.lighter,
-                displayedTimeTicks: 11,
-                timeSpan: 10,
-                maxNumValues: 500,
-                label: 'VOLUME ml',
-                labelHeightFactor: labelHeight / 2,
-                minValue: 0.0,
-                maxValue: 800.0,
-                mapper: mapper)
-          ],
-        )
-      ],
-      displayedValues: [
-        FormattedValue(
-          feedIndex: 3,
-          keepOriginalFormat: true,
-          format: '#0.0',
-          demoMinValue: 0,
-          demoMaxValue: 99.9,
-          displayers: [
-            ValueBox(
-                id: 'v:Ppeak',
-                valueIndex: 0,
-                label: 'Ppeak',
-                labelHeightFactor: labelHeight / 2,
-                units: 'cmH2O',
-                format: '##.#',
-                color: material.Colors.orange.shade300)
-          ],
-        ),
-        FormattedValue(
-          feedIndex: 4,
-          keepOriginalFormat: true,
-          format: '#0.0',
-          demoMinValue: 0,
-          demoMaxValue: 99.9,
-          displayers: [
-            ValueBox(
-                id: 'v:Pmean',
-                valueIndex: 1,
-                label: 'Pmean',
-                labelHeightFactor: labelHeight,
-                units: 'cmH2O',
-                format: '##.#',
-                color: material.Colors.orange.shade300)
-          ],
-        ),
-        FormattedValue(
-          feedIndex: 5,
-          keepOriginalFormat: true,
-          format: '#0.0',
-          demoMinValue: 0,
-          demoMaxValue: 99.9,
-          displayers: [
-            ValueBox(
-                valueIndex: 2,
-                id: 'v:PEEP',
-                label: 'PEEP',
-                units: 'cmH2O',
-                labelHeightFactor: labelHeight,
-                format: '##.#',
-                color: material.Colors.orange.shade300)
-          ],
-        ),
-        FormattedValue(
-          feedIndex: 6,
-          keepOriginalFormat: true,
-          format: '#0.0',
-          demoMinValue: 0,
-          demoMaxValue: 99.9,
-          displayers: [
-            ValueBox(
-                id: 'v:RR',
-                valueIndex: 3,
-                label: 'RR',
-                labelHeightFactor: labelHeight,
-                units: 'b/min',
-                format: '##.#',
-                color: material.Colors.lightGreen)
-          ],
-        ),
-        FormattedValue(
-          feedIndex: 7,
-          keepOriginalFormat: true,
-          format: '##0',
-          demoMinValue: 0,
-          demoMaxValue: 100.0,
-          displayers: [
-            ValueBox(
-                id: 'v:O2',
-                valueIndex: 4,
-                label: 'O2',
-                labelHeightFactor: labelHeight,
-                units: null,
-                format: '1##',
-                color: material.Colors.lightGreen,
-                postfix: '%')
-          ],
-        ),
-        FormattedValue(
-          feedIndex: 8,
-          keepOriginalFormat: true,
-          format: '#0.0',
-          demoMinValue: 0,
-          demoMaxValue: 99.9,
-          displayers: [
-            ValueBox(
-                id: 'v:Ti',
-                valueIndex: 5,
-                label: 'Ti',
-                labelHeightFactor: labelHeight,
-                units: 's',
-                format: '##.##',
-                color: material.Colors.lightGreen)
-          ],
-        ),
-        RatioValue(
-          feedIndex: 9,
-          keepOriginalFormat: true,
-          format: '0.0',
-          demoMinValue: 0.5,
-          demoMaxValue: 2,
-          displayers: [
-            ValueBox(
-                id: 'v:IE',
-                valueIndex: 6,
-                label: 'I:E',
-                labelHeightFactor: labelHeight,
-                units: null,
-                format: '1:#,#', // ',' instead of '.' so it doesn't align
-                color: material.Colors.lightGreen)
-          ],
-        ),
-        FormattedValue(
-          feedIndex: 10,
-          keepOriginalFormat: true,
-          format: '#0.0',
-          demoMinValue: 0,
-          demoMaxValue: 99.9,
-          displayers: [
-            ValueBox(
-                id: 'v:MVi',
-                valueIndex: 7,
-                label: 'MVi',
-                labelHeightFactor: labelHeight,
-                units: 'l/min',
-                format: '##.#',
-                color: material.Colors.lightBlue)
-          ],
-        ),
-        FormattedValue(
-          feedIndex: 11,
-          keepOriginalFormat: true,
-          format: '#0.0',
-          demoMinValue: 0,
-          demoMaxValue: 99.9,
-          displayers: [
-            ValueBox(
-                id: 'v:MVe',
-                valueIndex: 8,
-                label: 'MVe',
-                labelHeightFactor: labelHeight,
-                units: 'l/min',
-                format: '##.#',
-                color: material.Colors.lightBlue)
-          ],
-        ),
-        FormattedValue(
-          feedIndex: 12,
-          keepOriginalFormat: true,
-          format: '###0',
-          demoMinValue: 0,
-          demoMaxValue: 9999,
-          displayers: [
-            ValueBox(
-                id: 'v:VTi',
-                valueIndex: 9,
-                label: 'VTi',
-                labelHeightFactor: labelHeight,
-                units: null,
-                format: '####',
-                color: material.Colors.lightBlue)
-          ],
-        ),
-        FormattedValue(
-            feedIndex: 13,
-            keepOriginalFormat: true,
-            format: '###0',
-            demoMinValue: 0,
-            demoMaxValue: 9999,
-            displayers: [
-              ValueBox(
-                  id: 'v:VTe',
-                  valueIndex: 10,
-                  label: 'VTe',
-                  labelHeightFactor: labelHeight,
-                  units: 'ml',
-                  format: '####',
-                  color: material.Colors.lightBlue)
-            ])
-      ],
-      dequeIndexMap: mapper.dequeIndexMap);
+abstract class ColorHelper<C, TC> {
+  String encodeColor(C c);
+  C decodeColor(String hex);
+  String encodeChartColor(TC c);
+  TC decodeChartColor(String hex);
 }
 
-Screen _defaultScreen(DataFeed feed) {
-  final landscape = ScreenRow(content: [
-    ScreenColumn(flex: 8, content: [
-      DataWidget(displayer: feed.chartedValues[0].displayers[0]),
-      DataWidget(displayer: feed.chartedValues[1].displayers[0]),
-      DataWidget(displayer: feed.chartedValues[2].displayers[0]),
-    ]),
-    ScreenColumn(flex: 4, content: [
-      ScreenRow(content: [
-        DataWidget(flex: 4, displayer: feed.displayedValues[0].displayers[0]),
-        ScreenColumn(flex: 3, content: [
-          DataWidget(displayer: feed.displayedValues[1].displayers[0]),
-          DataWidget(displayer: feed.displayedValues[2].displayers[0]),
-        ])
-      ]),
-      ScreenRow(content: [
-        ScreenColumn(flex: 4, content: [
-          DataWidget(displayer: feed.displayedValues[3].displayers[0]),
-          DataWidget(displayer: feed.displayedValues[4].displayers[0]),
-        ]),
-        ScreenColumn(flex: 3, content: [
-          DataWidget(displayer: feed.displayedValues[5].displayers[0]),
-          DataWidget(displayer: feed.displayedValues[6].displayers[0]),
-        ])
-      ]),
-      ScreenRow(content: [
-        ScreenColumn(flex: 4, content: [
-          DataWidget(displayer: feed.displayedValues[7].displayers[0]),
-          DataWidget(displayer: feed.displayedValues[8].displayers[0]),
-        ]),
-        ScreenColumn(flex: 3, content: [
-          DataWidget(displayer: feed.displayedValues[9].displayers[0]),
-          DataWidget(displayer: feed.displayedValues[10].displayers[0]),
-        ])
-      ]),
-    ])
-  ]);
-
-  final portrait = ScreenRow(content: [
-    ScreenColumn(content: [
-      DataWidget(flex: 2, displayer: feed.chartedValues[0].displayers[0]),
-      DataWidget(flex: 2, displayer: feed.chartedValues[1].displayers[0]),
-      DataWidget(flex: 2, displayer: feed.chartedValues[2].displayers[0]),
-      ScreenRow(flex: 2, content: [
-        DataWidget(displayer: feed.displayedValues[0].displayers[0]),
-        ScreenColumn(content: [
-          DataWidget(displayer: feed.displayedValues[1].displayers[0]),
-          DataWidget(displayer: feed.displayedValues[2].displayers[0]),
-        ]),
-        ScreenColumn(content: [
-          DataWidget(displayer: feed.displayedValues[7].displayers[0]),
-          DataWidget(displayer: feed.displayedValues[8].displayers[0]),
-        ]),
-      ]),
-      ScreenRow(flex: 2, content: [
-        ScreenColumn(content: [
-          DataWidget(displayer: feed.displayedValues[3].displayers[0]),
-          DataWidget(displayer: feed.displayedValues[4].displayers[0]),
-        ]),
-        ScreenColumn(content: [
-          DataWidget(displayer: feed.displayedValues[5].displayers[0]),
-          DataWidget(displayer: feed.displayedValues[6].displayers[0]),
-        ]),
-        ScreenColumn(content: [
-          DataWidget(displayer: feed.displayedValues[9].displayers[0]),
-          DataWidget(displayer: feed.displayedValues[10].displayers[0]),
-        ])
-      ]),
-    ])
-  ]);
-
-  return Screen(name: 'default', portrait: portrait, landscape: landscape);
-}
-
-String _encodeColor(Color c) => toHex(c.value, 8);
-
-class _JsonHelper {
+class JsonHelper<C, TC> {
   final Map<Object, Object> json;
-  final _DequeIndexMapper dequeIndexMapper;
-  final Map<String, DataDisplayer> displayers;
+  final DequeIndexMapper dequeIndexMapper;
+  final Map<String, DataDisplayer<C, TC>> displayers;
+  final ColorHelper<C, TC> colorHelper;
+  static final Map<String, ValueAlignment> alignments = _populate<ValueAlignment>(ValueAlignment.values);
 
-  _JsonHelper(this.json)
-      : this.dequeIndexMapper = _DequeIndexMapper(),
-        this.displayers = Map<String, DataDisplayer>();
+  JsonHelper(this.json, this.colorHelper)
+      : this.dequeIndexMapper = DequeIndexMapper(),
+        this.displayers = Map<String, DataDisplayer<C, TC>>();
 
-  _JsonHelper.child(this.json, _JsonHelper parent)
+  JsonHelper.child(this.json, JsonHelper<C, TC> parent)
       : this.dequeIndexMapper = parent.dequeIndexMapper,
-        this.displayers = parent.displayers;
+        this.displayers = parent.displayers,
+        this.colorHelper = parent.colorHelper;
+
+  static Map<String, T> _populate<T>(List<T> values) {
+    final result = Map<String, T>();
+    for (final v in values) {
+      result[enumName(v)] = v;
+    }
+    return result;
+  }
+
+  static String enumName<T>(T value) {
+    final s = value.toString();
+    return s.substring(s.indexOf('.')+1);
+  }
 
   Object operator [](String key) {
     if (!json.containsKey(key)) {}
@@ -1328,10 +990,18 @@ class _JsonHelper {
   Object getOrNull(String key) {
     final v = json[key];
     if (v is Map) {
-      return _JsonHelper.child(v, this);
+      return JsonHelper<C, TC>.child(v, this);
     } else {
       return v;
     }
+  }
+
+  ValueAlignment getAlignment(String key) {
+    final r = alignments[this[key] as String];
+    if (r == null) {
+      throw ArgumentError('Error in alignment value ${this[key]}');
+    }
+    return r;
   }
 
   void expect(String key, Object value) {
@@ -1343,27 +1013,30 @@ class _JsonHelper {
   List<E> getList<E>(String key) =>
       List<E>.from(this[key] as List<Object>, growable: false);
 
-  Color getColor(String key) =>
-      Color(int.parse(json[key] as String, radix: 16));
+  C getColor(String key) => colorHelper.decodeColor(json[key] as String);
 
-  E decode<E>(String key, E decoder(_JsonHelper json)) =>
-      decoder(this[key] as _JsonHelper);
+  TC getChartColor(String key) =>
+      colorHelper.decodeChartColor(json[key] as String);
 
-  List<E> decodeList<E>(String key, E decoder(_JsonHelper json, int index)) {
+  E decode<E>(String key, E decoder(JsonHelper<C, TC> json)) =>
+      decoder(this[key] as JsonHelper<C, TC>);
+
+  List<E> decodeList<E>(
+      String key, E decoder(JsonHelper<C, TC> json, int index)) {
     int i = 0;
     return getList<Map<Object, Object>>(key)
-        .map((map) => decoder(_JsonHelper.child(map, this), i++))
+        .map((map) => decoder(JsonHelper<C, TC>.child(map, this), i++))
         .toList(growable: false);
   }
 
-  void registerDisplayer(DataDisplayer d) {
+  void registerDisplayer(DataDisplayer<C, TC> d) {
     if (displayers.containsKey(d.id)) {
       throw ArgumentError('Duplicate value id ${d.id}');
     }
     displayers[d.id] = d;
   }
 
-  DataDisplayer findDisplayer(String key) {
+  DataDisplayer<C, TC> findDisplayer(String key) {
     String id = this[key] as String;
     final r = displayers[id];
     if (r == null) {
