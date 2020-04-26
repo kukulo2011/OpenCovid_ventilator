@@ -11,8 +11,12 @@ import 'package:charts_flutter/flutter.dart' as charts;
 import 'configure.dart';
 import 'utils.dart';
 
-/// The Android-specific part of configure
+// This module contains the Android-specific realizations of the generic
+// classes in configure.dart.
 
+/// A reader to read a configuration's JSON file.  The JSON file is expected
+/// to be in a number of lines.  The end of a configuration is signaled by
+/// a blank line, or an EOF.
 class BreezyConfigurationJsonReader {
   bool get done => _done;
   bool _done = false;
@@ -60,6 +64,8 @@ class BreezyConfigurationJsonReader {
   }
 }
 
+/// The android realiztion of BreezyConfiguration, with appropriate
+/// color types.
 abstract class AndroidBreezyConfiguration
     extends BreezyConfiguration<Color, charts.Color> {
   static Directory localStorage;
@@ -88,6 +94,7 @@ abstract class AndroidBreezyConfiguration
   }
 }
 
+/// A configuration read from JSON.
 class JsonBreezyConfiguration extends AndroidBreezyConfiguration {
   final List<String> _sampleLog;
 
@@ -164,6 +171,8 @@ class JsonBreezyConfiguration extends AndroidBreezyConfiguration {
   }
 }
 
+/// The default configuration, created in code and using the demo log file
+/// packaged as an asset.
 class DefaultBreezyConfiguration extends AndroidBreezyConfiguration {
   DefaultBreezyConfiguration(
       {@required String name,
@@ -211,6 +220,7 @@ class DefaultBreezyConfiguration extends AndroidBreezyConfiguration {
   }
 }
 
+/// The Android reqalization of ColorHelper.
 class AndroidColorHelper extends ColorHelper<Color, charts.Color> {
   @override
   String encodeColor(material.Color c) => toHex(c.value, 8);
@@ -233,6 +243,8 @@ class AndroidColorHelper extends ColorHelper<Color, charts.Color> {
   }
 }
 
+/// Our default feed.  This is the definition of the feed and the screen
+/// for the ventilator project.
 DataFeed<Color, charts.Color> _defaultFeed() {
   final mapper = DequeIndexMapper();
   final labelHeight = 0.24;

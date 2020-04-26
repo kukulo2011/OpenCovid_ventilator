@@ -63,10 +63,12 @@ abstract class ByteStreamReader {
 
   ByteStreamReader(this.settings, this.listener);
 
-  /// Start reading from our data source
+  /// Start reading from our data source.  Returns a future that may
+  /// complete early, or may complete later.  Will throw an exception if there
+  /// is a problem.
   Future<void> start();
 
-  /// Shut down the reader
+  /// Shut down the reader.  It's OK to call this before start() completes.
   @mustCallSuper
   void stop() {
     stopped = true;
@@ -89,6 +91,8 @@ abstract class ByteStreamReader {
     }
   }
 
+  /// Read the given stream.  Returns a future that completes when the
+  /// underlying stream is finished.
   Future<void> _readStream(Stream<List<int>> stream, {void Function() onDone}) {
     _subscriptionDone = Completer<void>();
     _subscriptionOnDone = onDone;
@@ -172,6 +176,7 @@ abstract class ByteStreamReader {
   }
 }
 
+/// A reader of the serial port.
 class SerialReader extends ByteStreamReader {
   UsbPort _port;
 

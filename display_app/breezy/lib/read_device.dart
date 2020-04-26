@@ -104,6 +104,10 @@ abstract class DeviceDataSource {
 
   bool get running => _listener != null;
 
+  /// Start the data source.
+  /// Start reading from our data source.  Returns a future that may
+  /// complete immediately, or sometime later.  This allows the data source
+  /// to detect errors, and throw exceptions as appropriate.
   @mustCallSuper
   Future<void> start(DeviceDataListener listener) async {
     assert(listener != null);
@@ -377,8 +381,8 @@ class _HttpDataSource extends _ByteStreamDataSource {
 
   @override
   Future<void> start(DeviceDataListener listener) async {
-    await super.start(listener);
     client = HttpClient();
+    await super.start(listener);
   }
 
   @override
@@ -390,6 +394,7 @@ class _HttpDataSource extends _ByteStreamDataSource {
       } catch (ex) {
         Log.writeln('Invalid Uri from http connection:  $line');
       }
+      return Future<void>.value(null);
     } else {
       return super.receiveLine(line);
     }

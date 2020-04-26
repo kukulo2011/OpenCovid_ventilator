@@ -29,8 +29,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-/// A box that shows a numeric value, along with a label and units.
-///
+/// A box that shows a numeric or string value, along with a label and units.
+/// The text is sized to fit in the available space, and the value can be
+/// intelligently aligned.
 class AlignedText extends StatefulWidget {
   final String value; // may be null
   final ValueAlignment alignment;

@@ -28,7 +28,6 @@ SOFTWARE.
  */
 
 /// A text field that aligns itself to the available space
-///
 class FittedText extends StatefulWidget {
   final String value;
   final TextStyle style;

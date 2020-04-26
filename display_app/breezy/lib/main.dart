@@ -86,6 +86,9 @@ class BreezyHomePage extends StatefulWidget {
   _BreezyHomePageState createState() => _BreezyHomePageState();
 }
 
+/// Potentially mutable global state for the app.  This could just be held
+/// in static variables scattered around, but I like maintaining it
+/// centrally, and passing it down the tree.  Old habit, perhaps.
 class BreezyGlobals {
   final Settings settings = Settings();
   config.BreezyConfiguration configuration;
@@ -364,6 +367,7 @@ abstract class SettingsListener {
   void settingsChanged();
 }
 
+/// Settings that we persist.
 class Settings {
   static File settingsFile;
   final listeners = List<SettingsListener>();

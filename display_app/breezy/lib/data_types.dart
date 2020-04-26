@@ -32,12 +32,15 @@ SOFTWARE.
 // JSON config file can't depend on any code in a file with dependencies
 // on flutter, or other phone-only classes.  :-(
 
+/// A data element with a time value, suitable for presentation in a chart.
 abstract class TimedData {
     /// Time in milliseconds
     double get timeS;
 }
 
-abstract class WindowedData<T> {
+/// A structure for holding timed data that can be appended to, with older
+/// data falling off the other end.  Charts can display WindowedData.
+abstract class WindowedData<T extends TimedData> {
     void append(T e);
     double get windowSize;
     List<T> get window;
@@ -141,6 +144,7 @@ class RollingDeque<T extends TimedData> implements WindowedData<T> {
     double get timeOffset => 0;
 }
 
+/// And iterable we use to create a "window" of the values in the deque.
 class _RollingDequeWindowIterable<T extends TimedData> extends IterableBase<T> {
     final RollingDeque<T> _deque;
     final int _startIndex;
@@ -251,6 +255,7 @@ class SlidingDeque<T extends TimedData> implements WindowedData<T> {
     double get timeOffset => (length == 0) ? 0.0 : first.timeS;
 }
 
+/// And iterable we use to create a "window" of the values in the deque.
 class _SlidingDequeWindowIterable<T extends TimedData> extends IterableBase<T> {
     final SlidingDeque<T> _deque;
 
@@ -290,6 +295,8 @@ class _SlidingDequeWindowIterator<T extends TimedData> implements Iterator<T> {
 enum ValueAlignment { left, center, right, decimal }
 
 
+/// The chart data for our app.  The deques, above, could have just been
+/// written in terms of `ChartData`, but it's nice to decouple them a bit.
 class ChartData extends TimedData {
     final List<double> values;
     @override

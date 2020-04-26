@@ -32,8 +32,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-//    cf. https://pub.dev/packages/receive_sharing_intent,
-//        https://stackoverflow.com/questions/4799576/register-a-new-file-type-in-android#4838863
+// This module describes a breezy configuration.  See the docs, in particular,
+// docs/configure.svg and the accompanying document.
 
 mixin _Commentable {
   List<String> _comment;
@@ -85,10 +85,8 @@ abstract class BreezyConfiguration<C, TC> with _Commentable {
     return _screenNumByName[name];
   }
 
-  /// Ouput this configuration as a map, suitable to be written out
-  /// with JsonEncoder.  This isn't truly needed in production, but it's the
-  /// easiest way to make a sample JSON file from the default config.
-  /// It's hooked into the server socket implementation.
+  /// Output this configuration as a map, suitable to be written out
+  /// with JsonEncoder.
   Future<Map<String, Object>> toJson({bool stripComments = false}) async {
     return withComment(stripComments, {
       'type': 'BreezyConfiguration',
@@ -174,6 +172,8 @@ class DequeIndexMapper {
   }
 }
 
+/// A description of a data feed, including the components that are used
+/// to display the values.
 class DataFeed<C, TC> with _Commentable {
   final String protocolName;
   final int protocolVersion;
@@ -304,11 +304,15 @@ class DataFeed<C, TC> with _Commentable {
   }
 }
 
+/// A place to the index in of values.  A value can appear in both places.  If
+/// a value has no displayers, it's put in "displayed," since displayed values
+/// are cheaper - we don't keep a history of displayed values.
 class _ValueIndex {
   final charted = Map<Value, int>();
   final displayed = Map<Value, int>();
 }
 
+/// A description of a value in a data feed.
 class Value<C, TC> with _Commentable {
   final double demoMinValue;
   final double demoMaxValue;
@@ -331,6 +335,9 @@ class Value<C, TC> with _Commentable {
             .toList(growable: false)
       });
 
+  /// Format a double appropriately.  This is useful for the screen demo
+  /// function to come up with credible-looking random-ish values to
+  /// display.
   String formatValue(double value) => '$value';
 
   /// Format a string value for a feed:
@@ -338,6 +345,8 @@ class Value<C, TC> with _Commentable {
   ///    \c becomes ,
   ///    \n becomes newline
   /// This lets us have commas and newlines in string values in the feed.
+  /// Remember, it's sent as a comma-separated value, newline-terminated
+  /// bit of text.
   String formatFeedValue(String value) {
     if (!value.contains('\\')) {
       return value;
@@ -436,6 +445,10 @@ class Value<C, TC> with _Commentable {
   }
 }
 
+/// A value with an expected format.  If keepOriginalFormat is true, the
+/// string from the feed is displayed on the screen; otherwise the feed
+/// value is re-formatted.  The format is also useful for the screen demo
+/// function, which generates random-ish values for display.
 class FormattedValue<C, TC> extends Value<C, TC> {
   final NumberFormat format;
   final String _formatPattern;
@@ -479,6 +492,8 @@ class FormattedValue<C, TC> extends Value<C, TC> {
       });
 }
 
+/// A special value that diplays as "1:n" or "n:1", depending on whether
+/// the underlying value i < 1.0 or not.
 class RatioValue<C, TC> extends FormattedValue<C, TC> {
   RatioValue(
       {@required String format,
@@ -507,6 +522,9 @@ class RatioValue<C, TC> extends FormattedValue<C, TC> {
   String get _jsonTypeName => 'RatioValue';
 }
 
+/// Definition of the appearance of a screen.  The user can switch between
+/// screens using a ScreenSwitchArrow, or the feed can have a value that
+/// switches screens.
 class Screen<C, TC> with _Commentable {
   final String name;
   final ScreenContainer portrait;
@@ -559,6 +577,7 @@ class Screen<C, TC> with _Commentable {
   }
 }
 
+/// A component of a feed's value that displays data.
 abstract class DataDisplayer<C, TC> with _Commentable {
   final String id;
 
@@ -592,6 +611,7 @@ abstract class DataDisplayer<C, TC> with _Commentable {
   }
 }
 
+/// A box that contains a numeric or string value.
 class ValueBox<C, TC> extends DataDisplayer<C, TC> {
   int _valueIndex;
   int get valueIndex {
@@ -653,6 +673,7 @@ class ValueBox<C, TC> extends DataDisplayer<C, TC> {
   void accept(ScreenWidgetVisitor v) => v.visitValueBox(this);
 }
 
+/// A chart to display a value with time as the X axis.
 class TimeChart<C, TC> extends DataDisplayer<C, TC> {
   final bool rolling;
   final double minValue;
@@ -720,6 +741,9 @@ class TimeChart<C, TC> extends DataDisplayer<C, TC> {
   void accept(ScreenWidgetVisitor v) => v.visitTimeChart(this);
 }
 
+/// A visitor for a tree of ScreenWidget instances.  The visitor pattern allows
+/// us to avoid any coupling between this module and Android-specific classes.
+/// cf. `make_config/configure_dt.dart` and `make_config/weather_demo.dart`.
 abstract class ScreenWidgetVisitor<C, TC> {
   void visitColumn(ScreenColumn<C, TC> w);
   void visitRow(ScreenRow<C, TC> w);
@@ -732,6 +756,8 @@ abstract class ScreenWidgetVisitor<C, TC> {
   void visitValueBox(ValueBox<C, TC> w);
 }
 
+/// A component on the screen.  Ultimately these are used to build the Flutter
+/// widgets that make up the display.
 abstract class ScreenWidget<C, TC> with _Commentable {
   /// Defaults to 1.  Ignored for root node.
   final int flex;
@@ -789,6 +815,7 @@ abstract class ScreenWidget<C, TC> with _Commentable {
       _fromJson(json);
 }
 
+/// A widget to add some blank space in a layout.
 class Spacer<C, TC> extends ScreenWidget<C, TC> {
   Spacer(int flex) : super(flex);
 
@@ -801,6 +828,9 @@ class Spacer<C, TC> extends ScreenWidget<C, TC> {
 }
 
 
+/// A widget to add a border.  Normally, you want a fixed width for this,
+/// so the flex should usually be null.  If it's not, the width of the line
+/// will scale with the screen.
 class Border<C, TC> extends ScreenWidget<C, TC> {
   C color;
   double width;
@@ -820,6 +850,7 @@ class Border<C, TC> extends ScreenWidget<C, TC> {
       'flex': flex});
 }
 
+/// An arrow that lets the user switch between the various screens.
 class ScreenSwitchArrow<C, TC> extends ScreenWidget<C, TC> {
   final C color;
 
@@ -837,6 +868,7 @@ class ScreenSwitchArrow<C, TC> extends ScreenWidget<C, TC> {
       });
 }
 
+/// A fixed label.
 class Label<C, TC> extends ScreenWidget<C, TC> {
   final String text;
   final C color;
@@ -857,6 +889,7 @@ class Label<C, TC> extends ScreenWidget<C, TC> {
       });
 }
 
+/// A container of other widgets.
 abstract class ScreenContainer<C, TC> extends ScreenWidget<C, TC> {
   final List<ScreenWidget<C, TC>> content;
   ScreenContainer({int flex=1, @required this.content}) : super(flex);
@@ -882,6 +915,7 @@ abstract class ScreenContainer<C, TC> extends ScreenWidget<C, TC> {
       });
 }
 
+/// A set of widgets arranged in a column.
 class ScreenColumn<C, TC> extends ScreenContainer<C, TC> {
   ScreenColumn({int flex = 1, @required List<ScreenWidget<C, TC>> content})
       : super(flex: flex, content: content) {
@@ -905,6 +939,7 @@ class ScreenColumn<C, TC> extends ScreenContainer<C, TC> {
   String get _jsonTypeName => 'ScreenColumn';
 }
 
+/// A set of widgets arranged in a row.
 class ScreenRow<C, TC> extends ScreenContainer<C, TC> {
   ScreenRow({int flex = 1, @required List<ScreenWidget<C, TC>> content})
       : super(flex: flex, content: content) {
@@ -928,6 +963,7 @@ class ScreenRow<C, TC> extends ScreenContainer<C, TC> {
   String get _jsonTypeName => 'ScreenRow';
 }
 
+/// A widget that presents a DataDisplayer from a feed.
 class DataWidget<C, TC> extends ScreenWidget<C, TC> {
   final DataDisplayer<C, TC> displayer;
 
@@ -942,6 +978,13 @@ class DataWidget<C, TC> extends ScreenWidget<C, TC> {
           {'type': 'DataWidget', 'dataID': displayer.id, 'flex': flex});
 }
 
+/// A little helper class to map between hex strings and colors.  The app
+/// has to deal with two different Color classes:  The normal Flutter color,
+/// and (for whatever reason) the different Color class that's used by the
+/// charts package.  Desktop flutter, on the other hand, doesn't have a
+/// default Color class, so we use one swiped from a CSS package.  It's a mess,
+/// but this class an the <C, TC> generics sprinkled throughout this module
+/// resolve, with, while managing dependencies.
 abstract class ColorHelper<C, TC> {
   String encodeColor(C c);
   C decodeColor(String hex);
@@ -949,6 +992,8 @@ abstract class ColorHelper<C, TC> {
   TC decodeChartColor(String hex);
 }
 
+///  A little helper class for encoding and decoding the JSON format of a
+///  configuration.
 class JsonHelper<C, TC> {
   final Map<Object, Object> json;
   final DequeIndexMapper dequeIndexMapper;

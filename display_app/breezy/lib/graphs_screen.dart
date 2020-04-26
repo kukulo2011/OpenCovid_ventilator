@@ -60,6 +60,7 @@ class GraphsScreen extends StatefulWidget {
   _GraphsScreenState createState() => _GraphsScreenState(_dataSource, _globals);
 }
 
+/// Where we capture all of the data currently being displayed.
 class HistoricalData {
   DeviceData _current;
   final List<WindowedData<ChartData>> _deques;
@@ -105,6 +106,9 @@ class _GraphsScreenState extends State<GraphsScreen>
     screenNum = 0;
     screen = globals.configuration.screens[screenNum];
     unawaited(() async {
+      // Execute this in a microtask.  The data source reserves the right
+      // to take some time before it completes its future, so that it can
+      // report an error, if needed.
       await Screen.keepOn(true);
       try {
         await _dataSource.start(this);
@@ -130,6 +134,7 @@ class _GraphsScreenState extends State<GraphsScreen>
     _notifyBuild();
   }
 
+  /// Advance to the next screen in our configuration's list of screens.
   void advanceScreen() {
     setState(() {
       screenNum = (screenNum + 1) % globals.configuration.screens.length;
@@ -249,6 +254,8 @@ class _GraphsScreenState extends State<GraphsScreen>
   }
 }
 
+/// The visitor we send to the current Screen to build our Flutter widget
+/// tree on every frame of animation.
 class _WidgetBuilder
     implements config.ScreenWidgetVisitor<Color, charts.Color> {
   HistoricalData data;

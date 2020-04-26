@@ -29,6 +29,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
+/// A page for debugging data sources.
 class InputTestPage extends StatefulWidget {
   final BreezyGlobals globals;
   final AssetBundle bundle;
