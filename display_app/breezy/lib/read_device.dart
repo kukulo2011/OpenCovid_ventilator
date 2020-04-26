@@ -58,6 +58,7 @@ abstract class DeviceDataListener {
   Future<void> processDeviceData(DeviceData d);
   Future<void> processNewConfiguration(
       AndroidBreezyConfiguration c, DeviceDataSource nextSource);
+  Future<void> processError(Exception ex);
   Future<void> processEOF();
 }
 
@@ -118,6 +119,8 @@ abstract class DeviceDataSource {
   void stop() {
     _listener = null;
   }
+
+  Future<void> receiveError(Exception ex) => _listener.processError(ex);
 }
 
 abstract class _ByteStreamDataSource extends DeviceDataSource
@@ -156,6 +159,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
   /// connections, like a server socket.
   @mustCallSuper
   Future<void> reset() {
+    _lineBuffer.clear();
     return _resetTime();
   }
 
@@ -210,7 +214,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
       return;
     } else if (line.startsWith('meter-data:')) {
       _meterData = line.substring(11).trim().toLowerCase() != 'off';
-      print('meterData set $_meterData from feed.');
+      Log.writeln('meterData set $_meterData from feed.');
       return;
     } else if (line.startsWith('read-config-compact:')) {
       try {
@@ -420,7 +424,22 @@ class _HttpDataSource extends _ByteStreamDataSource {
         unawaited(_listener.processEOF());
       } else {
         reader = createReader(settings);
-        unawaited(reader.start());
+        try {
+          await reader.start();
+        } catch (ex, st) {
+          if (st == null) {
+            Log.writeln(ex);
+          } else {
+            Log.writeln(st);
+          }
+          nextUri = null;
+          if (ex is Exception) {
+            await _listener.processError(ex);
+          } else {
+            await _listener.processError(Exception(ex.toString));
+          }
+          unawaited(_listener.processEOF());
+        }
       }
     }
   }
@@ -554,7 +573,6 @@ class _ScreenDebugDeviceDataSource extends DeviceDataSource {
   Future<void> start(DeviceDataListener listener) async {
     await super.start(listener);
     unawaited(_sendEvents());
-    // _timer = Timer.periodic(Duration(milliseconds: 20), (_) => _tick());
   }
 
   @override

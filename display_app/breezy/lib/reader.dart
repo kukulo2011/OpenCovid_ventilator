@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:pedantic/pedantic.dart' show unawaited;
 import 'package:usb_serial/usb_serial.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
-    show BluetoothConnection, FlutterBluetoothSerial;
+    show BluetoothConnection, FlutterBluetoothSerial, BluetoothDevice;
 
 import 'configure.dart';
 import 'main.dart' show Log, Settings, BreezyGlobals;
@@ -42,6 +42,9 @@ abstract class StringStreamListener {
   /// Receive data from the stream.
   Future<void> receive(String input);
 
+  // Note that an exception has happened
+  Future<void> receiveError(Exception ex);
+
   // Reset the listener because the stream ended.  The reader should prepare
   // for a (potential) new stream.
   Future<void> reset();
@@ -51,7 +54,7 @@ abstract class ByteStreamReader {
   final Settings settings;
   final StringStreamListener listener;
   bool stopped = false;
-  final _events = Queue<String>();
+  final _events = Queue<Object>(); // String or Exception instances
   int _bytesInBuffer = 0;
   final int _bufferSize = 512;
   // https://github.com/kukulo2011/OpenCovid_ventilator/issues/18
@@ -63,8 +66,8 @@ abstract class ByteStreamReader {
 
   ByteStreamReader(this.settings, this.listener);
 
-  /// Start reading from our data source.  Returns a future that may
-  /// complete early, or may complete later.  Will throw an exception if there
+  /// Start reading from our data source.  Returns a future that completes
+  /// when the device is started.  Will throw an exception if there
   /// is a problem.
   Future<void> start();
 
@@ -93,7 +96,8 @@ abstract class ByteStreamReader {
 
   /// Read the given stream.  Returns a future that completes when the
   /// underlying stream is finished.
-  Future<void> _readStream(Stream<List<int>> stream, {void Function() onDone}) {
+  Future<void> _readStream(final Stream<List<int>> stream,
+      {final void Function() onDone}) {
     _subscriptionDone = Completer<void>();
     _subscriptionOnDone = onDone;
     final done = _subscriptionDone.future;
@@ -103,8 +107,17 @@ abstract class ByteStreamReader {
     }
     _subscription = Utf8Decoder().bind(stream).listen((String data) {
       _receive(data);
+    }, onError: (Object err, StackTrace st) {
+      if (err is Exception) {
+        _events.add(err);
+      } else {
+        _events.add(Exception(err.toString()));
+      }
     }, onDone: () {
-      _finishSubscription();
+      _events.add(null);
+      if (!_processingQueue) {
+        unawaited(_processQueue());
+      }
     });
     return done;
   }
@@ -123,28 +136,34 @@ abstract class ByteStreamReader {
     try {
       while (_events.isNotEmpty) {
         final event = _events.removeFirst();
-        final eventLen = event.length;
-        const maxChunk = 2000;
-        if (eventLen <= maxChunk) {
-          if (stopped) {
-            return;
-          }
-          await listener.receive(event);
-          _bytesInBuffer -= eventLen;
-          _resumeIfReady();
-        } else {
-          // This should only happens in a stress test, where the device is
-          // being flooded by data.  In that case, sockets, for example,
-          // have a pretty big buffer.
-          for (int i = 0; i < eventLen; i += maxChunk) {
+        if (event is String) {
+          final eventLen = event.length;
+          const maxChunk = 2000;
+          if (eventLen <= maxChunk) {
             if (stopped) {
               return;
             }
-            final len = min(eventLen - i, maxChunk);
-            await listener.receive(event.substring(i, i + len));
-            _bytesInBuffer -= len;
+            await listener.receive(event);
+            _bytesInBuffer -= eventLen;
             _resumeIfReady();
+          } else {
+            // This should only happens in a stress test, where the device is
+            // being flooded by data.  In that case, sockets, for example,
+            // have a pretty big buffer.
+            for (int i = 0; i < eventLen; i += maxChunk) {
+              if (stopped) {
+                return;
+              }
+              final len = min(eventLen - i, maxChunk);
+              await listener.receive(event.substring(i, i + len));
+              _bytesInBuffer -= len;
+              _resumeIfReady();
+            }
           }
+        } else if (event == null) {
+          _finishSubscription();
+        } else {
+          await listener.receiveError(event as Exception);
         }
       }
     } finally {
@@ -297,6 +316,10 @@ class ServerSocketReader extends ByteStreamReader {
       }
       return;
     }
+    unawaited(_listenForConnections());
+  }
+
+  Future<void> _listenForConnections() async {
     InternetAddress lastAddress;
     _serverSocket.listen((Socket socket) {
       if (_readingFrom != null) {
@@ -370,6 +393,10 @@ class AssetFileReader extends ByteStreamReader {
     if (log.isEmpty) {
       throw Exception('Sample log is empty.');
     }
+    unawaited(_loopOverLog(log));
+  }
+
+  Future<void> _loopOverLog(final List<String> log) async {
     while (!stopped) {
       await _readStream(_makeStream(log));
       // Just keep time marching forward, while looping through the data.
@@ -401,6 +428,10 @@ class BluetoothClassicReader extends ByteStreamReader {
       Log.writeln('Please select one in Settings.');
       return;
     }
+    unawaited(_keepTrying(device));
+  }
+
+  Future<void> _keepTrying(final BluetoothDevice device) async {
     try {
       while (!stopped) {
         Log.writeln('Connecting to ${device.name} (${device.address})...');

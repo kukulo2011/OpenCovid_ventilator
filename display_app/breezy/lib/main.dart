@@ -201,9 +201,9 @@ class _BreezyHomePageState extends State<BreezyHomePage>
           }
           globals.configuration = c;
         } catch (ex, st) {
-          print('Error reading configuration $name!');
-          print(st);
-          print(ex);
+          Log.writeln('Error reading configuration $name!');
+          Log.writeln(st);
+          Log.writeln(ex);
           // Unless someone manually deletes a config file, this shouldn't
           // happen.
           globals.configuration =
@@ -257,13 +257,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                           ],
                         )),
                     PopupMenuItem<void Function()>(
-                        value: () {
-                          Navigator.push<void>(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => InputTestPage(globals,
-                                      DefaultAssetBundle.of(context))));
-                        },
+                        value: () => unawaited(_showInputTest()),
                         child: Row(
                           children: <Widget>[
                             Text('Test Input Port'),
@@ -300,11 +294,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                           Icon(Icons.power_settings_new, color: Colors.black),
                         ])),
                   ];
-                }
-//              icon: Icon(Icons.power_settings_new),
-//              tooltip: 'Quit',
-//              onPressed: () { exit(0); }
-                )
+                })
           ],
         ),
         body: Builder(
@@ -366,11 +356,54 @@ class _BreezyHomePageState extends State<BreezyHomePage>
 
   Future<void> _showGraphsScreen(DeviceDataSource src) async {
     while (src != null) {
-      src = await Navigator.push<DeviceDataSource>(
+      final r = await Navigator.push<Object>(
           context,
           MaterialPageRoute(
               builder: (context) =>
                   GraphsScreen(dataSource: src, globals: globals)));
+      src = null;
+      if (r is DeviceDataSource) {
+        /*
+        await showDialog<void>(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('New Screen Configuration'),
+                content: Column(children: [
+                  SizedBox(height: 20),
+                  Text('A new screen definition was read,'),
+                  Text('along with a new source of data.')
+                ]),
+                actions: <Widget>[
+                  // usually buttons at the bottom of the dialog
+                  FlatButton(
+                    child: Text('Proceed'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                  )
+                ],
+              );
+            });
+
+         */
+        src = r;
+      } else if (r is Exception) {
+        showErrorDialog(context, 'Connection error', r);
+      } else {
+        assert(r == null);
+      }
+    }
+  }
+
+  Future<void> _showInputTest() async {
+    final err = await Navigator.push<Exception>(
+        context,
+        MaterialPageRoute(
+            builder: (context) =>
+                InputTestPage(globals, DefaultAssetBundle.of(context))));
+    if (err != null) {
+      await showErrorDialog(context, 'Error Reading', err);
     }
   }
 

@@ -43,12 +43,61 @@ SOFTWARE.
 /// All the state is put at the top for simplicity.  At least in the initial app,
 /// everything is updated at the same time, so it doesn't really make sense to
 /// try to optimize display if only part of the screen changes.
-///
-class GraphsScreen extends StatefulWidget {
+
+class GraphsScreen extends StatelessWidget {
+  final DeviceDataSource _dataSource;
+  final BreezyGlobals _globals;
+  GraphsScreen(
+      {Key key,
+      @required DeviceDataSource dataSource,
+      @required BreezyGlobals globals})
+      : this._dataSource = dataSource,
+        this._globals = globals,
+        super(key: key);
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(children: <Widget>[
+          Container(
+              decoration: const BoxDecoration(
+                  border: Border(
+                      top: BorderSide(width: 2, color: Colors.transparent),
+                      left: BorderSide(width: 2, color: Colors.transparent),
+                      right: BorderSide(width: 2, color: Colors.transparent),
+                      bottom: BorderSide(width: 2, color: Colors.transparent))),
+              child: _GraphsScreen(dataSource: _dataSource, globals: _globals)),
+          SizedBox(
+              width: 20,
+              height: 20,
+              child: IconButton(
+                  icon: Icon(Icons.arrow_back, color: Colors.white),
+                  iconSize: 14,
+                  padding: const EdgeInsets.all(0),
+                  tooltip: 'Back',
+                  onPressed: () {})),
+          SizedBox(
+            width: 50,
+            height: 50,
+            child: FlatButton(
+                color: Colors.transparent,
+                child: Container(),
+                padding: const EdgeInsets.all(0),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                }),
+          ),
+          // We show a tiny arrow, but make the touch area bigger.
+        ]),
+      ));
+}
+
+class _GraphsScreen extends StatefulWidget {
   final DeviceDataSource _dataSource;
   final BreezyGlobals _globals;
 
-  GraphsScreen(
+  _GraphsScreen(
       {Key key,
       @required DeviceDataSource dataSource,
       @required BreezyGlobals globals})
@@ -80,7 +129,7 @@ class HistoricalData {
   WindowedData<ChartData> getDeque(int index) => _deques[index];
 }
 
-class _GraphsScreenState extends State<GraphsScreen>
+class _GraphsScreenState extends State<_GraphsScreen>
     implements DeviceDataListener {
   static int _screenOnCount = 0;
   final DeviceDataSource _dataSource;
@@ -93,6 +142,8 @@ class _GraphsScreenState extends State<GraphsScreen>
   final _WidgetBuilder _builder;
   bool _disposed = false;
   bool _popCalled = false;
+  Exception _lastError;
+  DateTime _lastErrorTime;
 
   _GraphsScreenState(this._dataSource, this.globals)
       : _data = HistoricalData(globals.configuration.feed),
@@ -115,7 +166,11 @@ class _GraphsScreenState extends State<GraphsScreen>
       try {
         await _dataSource.start(this);
       } catch (ex, st) {
-        print(st);
+        if (st == null) {
+          print(ex);
+        } else {
+          print(st);
+        }
         if (!_disposed) {
           await showErrorDialog(context, "Error opening connection", ex);
         }
@@ -182,48 +237,6 @@ class _GraphsScreenState extends State<GraphsScreen>
   @override
   Widget build(BuildContext context) {
     _notifyBuild();
-    return Scaffold(
-        backgroundColor: Colors.black,
-        body: SafeArea(
-          child: Stack(children: <Widget>[
-            Container(
-                decoration: const BoxDecoration(
-                    border: Border(
-                        top: BorderSide(width: 2, color: Colors.transparent),
-                        left: BorderSide(width: 2, color: Colors.transparent),
-                        right: BorderSide(width: 2, color: Colors.transparent),
-                        bottom:
-                            BorderSide(width: 2, color: Colors.transparent))),
-                child: buildMainContents()),
-            SizedBox(
-                width: 20,
-                height: 20,
-                child: IconButton(
-                    icon: Icon(Icons.arrow_back, color: Colors.white),
-                    iconSize: 14,
-                    padding: const EdgeInsets.all(0),
-                    tooltip: 'Back',
-                    onPressed: () {})),
-            SizedBox(
-              width: 50,
-              height: 50,
-              child: FlatButton(
-                  color: Colors.transparent,
-                  child: Container(),
-                  padding: const EdgeInsets.all(0),
-                  onPressed: () {
-                    if (!_popCalled) {
-                      _popCalled = true;
-                      Navigator.of(context).pop();
-                    }
-                  }),
-            ),
-            // We show a tiny arrow, but make the touch area bigger.
-          ]),
-        ));
-  }
-
-  Widget buildMainContents() {
     return OrientationBuilder(
         builder: (BuildContext context, Orientation orientation) {
       if (orientation == Orientation.portrait) {
@@ -252,10 +265,20 @@ class _GraphsScreenState extends State<GraphsScreen>
   }
 
   @override
+  Future<void> processError(Exception ex) async {
+    Scaffold.of(context).showSnackBar(SnackBar(
+        content: Text('Connection error:  $ex'),
+        duration: Duration(seconds: 30)));
+    _lastError = ex;
+    _lastErrorTime = DateTime.now();
+  }
+
+  @override
   Future<void> processEOF() async {
     if (!_popCalled) {
       _popCalled = true;
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(_lastError);
+      ;
     }
   }
 }

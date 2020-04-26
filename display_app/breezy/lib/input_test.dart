@@ -62,34 +62,46 @@ class _InputTestPageState extends State<InputTestPage>
     if (stopped) {
       return;
     }
-    switch (widget.globals.settings.inputSource) {
-      case InputSource.serial:
-        reader = SerialReader(widget.globals.settings, this);
-        break;
-      case InputSource.screenDebug:
-        reader = null;
-        break;
-      case InputSource.sampleLog:
-        reader = AssetFileReader(
-            widget.globals.settings, widget.globals.configuration, this);
-        break;
-      case InputSource.serverSocket:
-        reader = ServerSocketReader(widget.globals.settings, this);
-        break;
-      case InputSource.bluetoothClassic:
-        reader = BluetoothClassicReader(widget.globals.settings, this);
-        break;
-      case InputSource.http:
-        reader = HttpReader(null, Uri.parse(widget.globals.settings.httpUrl),
-            widget.globals.settings, this);
-        break;
-    }
-    if (reader == null) {
-      Log.writeln();
-      Log.writeln(
-          "${widget.globals.settings.inputSource} doesn't produce text");
-    } else {
-      return reader.start();
+    try {
+      switch (widget.globals.settings.inputSource) {
+        case InputSource.serial:
+          reader = SerialReader(widget.globals.settings, this);
+          break;
+        case InputSource.screenDebug:
+          reader = null;
+          break;
+        case InputSource.sampleLog:
+          reader = AssetFileReader(
+              widget.globals.settings, widget.globals.configuration, this);
+          break;
+        case InputSource.serverSocket:
+          reader = ServerSocketReader(widget.globals.settings, this);
+          break;
+        case InputSource.bluetoothClassic:
+          reader = BluetoothClassicReader(widget.globals.settings, this);
+          break;
+        case InputSource.http:
+          reader = HttpReader(null, Uri.parse(widget.globals.settings.httpUrl),
+              widget.globals.settings, this);
+          break;
+      }
+      if (reader == null) {
+        Log.writeln();
+        Log.writeln(
+            "${widget.globals.settings.inputSource} doesn't produce text");
+      } else {
+        await reader.start();
+      }
+    } catch (ex) {
+      if (context != null) {
+        if (ex is Exception) {
+          Navigator.of(context).pop(ex);
+        } else {
+          Navigator.of(context).pop(Exception(ex.toString()));
+        }
+      } else {
+        Log.writeln('Input test page got error after dismissal:  $ex');
+      }
     }
   }
 
@@ -191,6 +203,11 @@ class _InputTestPageState extends State<InputTestPage>
     // enough to see some screen updates.  In production, data should never
     // come continuously and at full speed, because there's only one value
     // every 20ms.
+  }
+
+  @override
+  Future<void> receiveError(Exception ex) {
+    return receive('\n*** Error in input:  $ex\n\n');
   }
 
   @override
