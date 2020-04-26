@@ -82,6 +82,7 @@ class HistoricalData {
 
 class _GraphsScreenState extends State<GraphsScreen>
     implements DeviceDataListener {
+  static int _screenOnCount = 0;
   final DeviceDataSource _dataSource;
   final BreezyGlobals globals;
   final HistoricalData _data;
@@ -102,6 +103,7 @@ class _GraphsScreenState extends State<GraphsScreen>
 
   @override
   void initState() {
+    _screenOnCount++;
     super.initState();
     screenNum = 0;
     screen = globals.configuration.screens[screenNum];
@@ -130,7 +132,10 @@ class _GraphsScreenState extends State<GraphsScreen>
     super.dispose();
     _disposed = true;
     _dataSource.stop();
-    unawaited(Screen.keepOn(false));
+    _screenOnCount--;
+    if (_screenOnCount == 0) {
+      unawaited(Screen.keepOn(false));
+    }
     _notifyBuild();
   }
 
