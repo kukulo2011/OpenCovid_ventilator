@@ -146,9 +146,7 @@ class _DequeSelector {
 
   @override
   bool operator ==(Object o) =>
-      o is _DequeSelector &&
-      isRolling == o.isRolling &&
-      timeSpan == o.timeSpan;
+      o is _DequeSelector && isRolling == o.isRolling && timeSpan == o.timeSpan;
 
   @override
   int get hashCode => hash2(isRolling, timeSpan);
@@ -202,7 +200,7 @@ class DataFeed<C, TC> with _Commentable {
     for (int i = 0; i < chartedValues.length; i++) {
       final v = chartedValues[i];
       wasSeen.add(v);
-      assert (!feedIndexSeen[v.feedIndex]);
+      assert(!feedIndexSeen[v.feedIndex]);
       feedIndexSeen[v.feedIndex] = true;
       for (final d in v.displayers) {
         if (d is TimeChart) {
@@ -216,7 +214,7 @@ class DataFeed<C, TC> with _Commentable {
       final v = displayedValues[i];
       if (!wasSeen.contains(v)) {
         wasSeen.add(v);
-        assert (!feedIndexSeen[v.feedIndex]);
+        assert(!feedIndexSeen[v.feedIndex]);
         feedIndexSeen[v.feedIndex] = true;
       }
       for (final d in v.displayers) {
@@ -227,7 +225,6 @@ class DataFeed<C, TC> with _Commentable {
         }
       }
     }
-
   }
 
   Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) {
@@ -294,8 +291,8 @@ class DataFeed<C, TC> with _Commentable {
     final result = List<WindowedData<ChartData>>(dequeIndexMap.length);
     dequeIndexMap.forEach((sel, i) {
       if (sel.isRolling) {
-        result[i] = RollingDeque<ChartData>(sel.timeSpan,
-            sel.timeSpan / 20, (double time) => ChartData.dummy(time));
+        result[i] = RollingDeque<ChartData>(sel.timeSpan, sel.timeSpan / 20,
+            (double time) => ChartData.dummy(time));
       } else {
         result[i] = SlidingDeque<ChartData>(sel.timeSpan);
       }
@@ -354,7 +351,7 @@ class Value<C, TC> with _Commentable {
 
     final backslash = '\\'.codeUnitAt(0);
     final letterC = 'c'.codeUnitAt(0);
-    final letterN  = 'n'.codeUnitAt(0);
+    final letterN = 'n'.codeUnitAt(0);
     final result = StringBuffer();
     bool backslashSeen = false;
     for (final ch in value.codeUnits) {
@@ -827,7 +824,6 @@ class Spacer<C, TC> extends ScreenWidget<C, TC> {
       withComment(stripComments, {'type': 'Spacer', 'flex': flex});
 }
 
-
 /// A widget to add a border.  Normally, you want a fixed width for this,
 /// so the flex should usually be null.  If it's not, the width of the line
 /// will scale with the screen.
@@ -838,16 +834,19 @@ class Border<C, TC> extends ScreenWidget<C, TC> {
   /// A border.  flex is usually left null; if set, it means the
   /// width of the border will expand to fill available space according
   /// to flex.
-  Border({@required this.color, this.width=1, int flex}) : super(flex);
+  Border({@required this.color, this.width = 1, int flex}) : super(flex);
 
   @override
   void accept(ScreenWidgetVisitor<C, TC> v) => v.visitBorder(this);
 
   @override
   Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments) =>
-      withComment(stripComments, {'type': 'Border', 'width': width,
+      withComment(stripComments, {
+        'type': 'Border',
+        'width': width,
         'color': helper.encodeColor(color),
-      'flex': flex});
+        'flex': flex
+      });
 }
 
 /// An arrow that lets the user switch between the various screens.
@@ -892,7 +891,7 @@ class Label<C, TC> extends ScreenWidget<C, TC> {
 /// A container of other widgets.
 abstract class ScreenContainer<C, TC> extends ScreenWidget<C, TC> {
   final List<ScreenWidget<C, TC>> content;
-  ScreenContainer({int flex=1, @required this.content}) : super(flex);
+  ScreenContainer({int flex = 1, @required this.content}) : super(flex);
 
   String get _jsonTypeName;
 
@@ -920,7 +919,7 @@ class ScreenColumn<C, TC> extends ScreenContainer<C, TC> {
   ScreenColumn({int flex = 1, @required List<ScreenWidget<C, TC>> content})
       : super(flex: flex, content: content) {
     for (final w in content) {
-      assert (!(w is ScreenColumn));
+      assert(!(w is ScreenColumn));
     }
   }
 
@@ -944,7 +943,7 @@ class ScreenRow<C, TC> extends ScreenContainer<C, TC> {
   ScreenRow({int flex = 1, @required List<ScreenWidget<C, TC>> content})
       : super(flex: flex, content: content) {
     for (final w in content) {
-      assert (!(w is ScreenRow));
+      assert(!(w is ScreenRow));
     }
   }
 
@@ -999,7 +998,8 @@ class JsonHelper<C, TC> {
   final DequeIndexMapper dequeIndexMapper;
   final Map<String, DataDisplayer<C, TC>> displayers;
   final ColorHelper<C, TC> colorHelper;
-  static final Map<String, ValueAlignment> alignments = _populate<ValueAlignment>(ValueAlignment.values);
+  static final Map<String, ValueAlignment> alignments =
+      _populate<ValueAlignment>(ValueAlignment.values);
 
   JsonHelper(this.json, this.colorHelper)
       : this.dequeIndexMapper = DequeIndexMapper(),
@@ -1020,7 +1020,7 @@ class JsonHelper<C, TC> {
 
   static String enumName<T>(T value) {
     final s = value.toString();
-    return s.substring(s.indexOf('.')+1);
+    return s.substring(s.indexOf('.') + 1);
   }
 
   Object operator [](String key) {

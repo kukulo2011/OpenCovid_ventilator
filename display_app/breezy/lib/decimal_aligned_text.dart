@@ -57,7 +57,7 @@ class AlignedText extends StatefulWidget {
   /// as wide as the widest value when rendered.
   AlignedText(
       {@required this.value,
-        @required this.alignment,
+      @required this.alignment,
       @required this.format,
       @required this.color,
       this.prefix,
@@ -66,7 +66,8 @@ class AlignedText extends StatefulWidget {
       this.unitsHeightFraction = 0.16,
       this.scale = 0.95,
       this.useBaseline = true,
-      Key key}) : super(key: key) {
+      Key key})
+      : super(key: key) {
     assert(format != null);
     assert(color != null);
   }
@@ -234,17 +235,17 @@ class _ValueBoxPainter extends CustomPainter {
             textAlign: TextAlign.left);
         p.layout(BoxConstraints());
         final double beforeReal = p.getMaxIntrinsicWidth(double.infinity);
-        switch(widget.alignment) {
+        switch (widget.alignment) {
           case ValueAlignment.left:
             _paintText(x, vy, span, canvas);
             break;
           case ValueAlignment.center:
-            _paintText(x + (beforeW - beforeReal)/2.0, vy, span, canvas);
+            _paintText(x + (beforeW - beforeReal) / 2.0, vy, span, canvas);
             break;
           case ValueAlignment.right:
-            // Fall through
+          // Fall through
           case ValueAlignment.decimal:
-          _paintText(x + beforeW - beforeReal, vy, span, canvas);
+            _paintText(x + beforeW - beforeReal, vy, span, canvas);
             break;
         }
         x += beforeW;

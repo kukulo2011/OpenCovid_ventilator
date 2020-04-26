@@ -210,7 +210,8 @@ class _GraphsScreenState extends State<GraphsScreen>
                     if (!_popCalled) {
                       _popCalled = true;
                       Navigator.of(context).pop();
-                    }}),
+                    }
+                  }),
             ),
             // We show a tiny arrow, but make the touch area bigger.
           ]),

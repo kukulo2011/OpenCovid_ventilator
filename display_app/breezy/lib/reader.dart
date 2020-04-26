@@ -360,8 +360,8 @@ class ServerSocketReader extends ByteStreamReader {
 class AssetFileReader extends ByteStreamReader {
   final BreezyConfiguration _config;
 
-  AssetFileReader(Settings settings, this._config,
-      StringStreamListener listener)
+  AssetFileReader(
+      Settings settings, this._config, StringStreamListener listener)
       : super(settings, listener);
 
   @override

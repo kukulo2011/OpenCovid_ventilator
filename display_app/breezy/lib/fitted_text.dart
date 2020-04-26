@@ -33,7 +33,8 @@ class FittedText extends StatefulWidget {
   final TextStyle style;
   final bool useBaseline;
 
-  FittedText(this.value, {Key key, this.style, this.useBaseline = false}) : super(key: key) {
+  FittedText(this.value, {Key key, this.style, this.useBaseline = false})
+      : super(key: key) {
     assert(value != null);
     assert(style == null || style.inherit);
     assert(useBaseline != null);

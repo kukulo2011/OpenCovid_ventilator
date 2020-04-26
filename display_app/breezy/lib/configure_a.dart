@@ -149,10 +149,10 @@ class JsonBreezyConfiguration extends AndroidBreezyConfiguration {
     try {
       AndroidBreezyConfiguration.localStorage.createSync(recursive: true);
       return AndroidBreezyConfiguration.localStorage
-        .listSync()
-        .map((FileSystemEntity f) => path.basename(f.path))
-        .toList(growable: false)
-        ..sort((s1, s2) => s1.toLowerCase().compareTo(s2.toLowerCase()));
+          .listSync()
+          .map((FileSystemEntity f) => path.basename(f.path))
+          .toList(growable: false)
+            ..sort((s1, s2) => s1.toLowerCase().compareTo(s2.toLowerCase()));
     } catch (ex, st) {
       print(st);
       print(ex);
@@ -163,7 +163,7 @@ class JsonBreezyConfiguration extends AndroidBreezyConfiguration {
   static void delete(String name) {
     try {
       File('${AndroidBreezyConfiguration.localStorage.path}/$name')
-        .deleteSync();
+          .deleteSync();
     } catch (ex, st) {
       print(st);
       print(ex);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pedantic/pedantic.dart';
-import 'configure_a.dart' show JsonBreezyConfiguration, DefaultBreezyConfiguration;
+import 'configure_a.dart'
+    show JsonBreezyConfiguration, DefaultBreezyConfiguration;
 import 'utils.dart';
 import 'main.dart'
     show
@@ -302,14 +303,17 @@ class _SettingsScreenState extends State<SettingsScreen>
         final cn = settings.configurationName;
         if (cn != null) {
           try {
-            widget.globals.configuration = await JsonBreezyConfiguration.read(cn);
+            widget.globals.configuration =
+                await JsonBreezyConfiguration.read(cn);
           } catch (ex) {
             await showErrorDialog(context, 'Error in configuration $cn', ex);
-            widget.globals.configuration = DefaultBreezyConfiguration.defaultConfig;
+            widget.globals.configuration =
+                DefaultBreezyConfiguration.defaultConfig;
             widget.globals.settings.configurationName = null;
           }
         } else {
-          widget.globals.configuration = DefaultBreezyConfiguration.defaultConfig;
+          widget.globals.configuration =
+              DefaultBreezyConfiguration.defaultConfig;
         }
         return true;
       },

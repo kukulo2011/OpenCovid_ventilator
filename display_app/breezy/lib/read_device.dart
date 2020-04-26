@@ -232,7 +232,8 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
       final numParts =
           feedSpec.numFeedValues + 4 + (feedSpec.screenSwitchCommand ? 1 : 0);
       if (parts.length != numParts) {
-        Log.writeln('Expected $numParts parts but got ${parts.length} in "$line"');
+        Log.writeln(
+            'Expected $numParts parts but got ${parts.length} in "$line"');
       } else if (parts[pos++] != feedSpec.protocolName) {
         Log.writeln('"${feedSpec.protocolName}" not first in "$line"');
       } else if (int.parse(parts[pos++]) != feedSpec.protocolVersion) {
@@ -312,7 +313,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
     try {
       final newConfig = configReader.getResult();
       await _listener.processNewConfiguration(
-        newConfig, _makeNextDataSource(newConfig));
+          newConfig, _makeNextDataSource(newConfig));
     } catch (ex, st) {
       await send('\r\n\nStack trace:  $st\r\n\n');
       await send('Error in new config:  $ex\r\n\n');

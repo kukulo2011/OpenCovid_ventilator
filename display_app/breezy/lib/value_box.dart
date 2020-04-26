@@ -30,7 +30,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-
 class ValueBox extends StatelessWidget {
   final String value; // may be null
   final String label;
@@ -53,7 +52,8 @@ class ValueBox extends StatelessWidget {
       this.prefix,
       this.postfix,
       this.alignment = ValueAlignment.decimal,
-      Key key}) : super(key: key) {
+      Key key})
+      : super(key: key) {
     assert(label != null);
     assert(labelHeightFactor != null);
     assert(format != null);

@@ -70,8 +70,8 @@ class _InputTestPageState extends State<InputTestPage>
         reader = null;
         break;
       case InputSource.sampleLog:
-        reader = AssetFileReader(widget.globals.settings,
-            widget.globals.configuration, this);
+        reader = AssetFileReader(
+            widget.globals.settings, widget.globals.configuration, this);
         break;
       case InputSource.serverSocket:
         reader = ServerSocketReader(widget.globals.settings, this);
