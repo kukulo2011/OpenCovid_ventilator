@@ -370,7 +370,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                 title: const Text('New Screen Configuration'),
                 content: Column(children: [
                   SizedBox(height: 20),
-                  Text('A new screen definition was read,'),
+                  Text('A new screen definition was sent to us,'),
                   Text('along with a new source of data.')
                 ]),
                 actions: <Widget>[
