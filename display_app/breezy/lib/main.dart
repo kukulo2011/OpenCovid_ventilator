@@ -363,7 +363,6 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                   GraphsScreen(dataSource: src, globals: globals)));
       src = null;
       if (r is DeviceDataSource) {
-        /*
         await showDialog<void>(
             context: context,
             builder: (BuildContext context) {
@@ -385,8 +384,6 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                 ],
               );
             });
-
-         */
         src = r;
       } else if (r is Exception) {
         showErrorDialog(context, 'Connection error', r);
