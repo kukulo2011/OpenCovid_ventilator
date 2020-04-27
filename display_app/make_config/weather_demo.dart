@@ -1,3 +1,4 @@
+
 import 'configure_dt.dart';
 // ignore: avoid_relative_lib_imports
 import '../breezy/lib/configure.dart';
@@ -221,7 +222,7 @@ final weather_demo = DesktopBreezyConfiguration(
     screens: [
       Screen(
           name: 'sliding',
-          portrait: ScreenColumn(content: [
+          portrait: ScreenColumn<Color, Color>(content: [
             ScreenRow(content: [
               Spacer(1),
               Label(
@@ -261,7 +262,7 @@ final weather_demo = DesktopBreezyConfiguration(
             ]),
             Border(color: _borderColor),
           ]),
-          landscape: ScreenColumn(content: [
+          landscape: ScreenColumn<Color, Color>(content: [
             ScreenRow(content: [
               Spacer(1),
               Label(
@@ -304,7 +305,7 @@ final weather_demo = DesktopBreezyConfiguration(
         ..comment('the current screen with each data sample.'),
       Screen(
           name: 'rolling',
-          portrait: ScreenColumn(content: [
+          portrait: ScreenColumn<Color, Color>(content: [
             ScreenRow(content: [
               Spacer(1),
               Label(
@@ -344,7 +345,7 @@ final weather_demo = DesktopBreezyConfiguration(
             ]),
             Border(color: _borderColor),
           ]),
-          landscape: ScreenColumn(content: [
+          landscape: ScreenColumn<Color, Color>(content: [
             ScreenRow(content: [
               Spacer(1),
               Label(
@@ -385,7 +386,7 @@ final weather_demo = DesktopBreezyConfiguration(
         ..comment('instead of sliding.'),
       Screen(
           name: 'long',
-          portrait: ScreenColumn(content: [
+          portrait: ScreenColumn<Color, Color>(content: [
             ScreenRow(content: [
               Label(
                   flex: 5,
