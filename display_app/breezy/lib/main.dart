@@ -407,15 +407,16 @@ class _BreezyHomePageState extends State<BreezyHomePage>
   void _showAbout() {
     showAboutDialog(
         context: context,
-        applicationIcon:
-            Image.asset('assets/breeze_icon_with_background_128x128.png'),
+        applicationIcon: Image.asset(
+            'assets/breeze_icon_with_background_128x128.png',
+            scale: 2),
         applicationName: globals.packageInfo.appName,
         applicationVersion: globals.packageInfo.version,
         applicationLegalese: '© 2020 Bill Foote',
         children: [
           Column(children: [
             SizedBox(height: 20),
-            Text('Displaying real-time data from'),
+            Text('Displaying timed data from'),
             Text('an embedded controller...'),
             SizedBox(height: 4),
             Text("It's a breeze with Breezy!"),
