@@ -86,10 +86,7 @@ abstract class AndroidBreezyConfiguration
     if (!await FileSystemEntity.identical(dir.path, f.parent.path)) {
       throw Exception('Illegal file name in $name');
     }
-    String str = JsonEncoder().convert(await toJson(stripComments: true));
-    List<int> bytes = utf8.encode(str);
-    str = null;
-    bytes = gzip.encoder.convert(bytes);
+    final List<int> bytes = await getCompactJson();
     await f.writeAsBytes(bytes);
   }
 }

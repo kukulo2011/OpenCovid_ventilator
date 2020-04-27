@@ -63,7 +63,7 @@
       ><path d="M0 0 L0 40 L680 40 L680 0 Z"
       /></clipPath
       ><clipPath clipPathUnits="userSpaceOnUse" id="clipPath20"
-      ><path d="M0 0 L0 110 L200 110 L200 0 Z"
+      ><path d="M0 0 L0 100 L200 100 L200 0 Z"
       /></clipPath
       ><clipPath clipPathUnits="userSpaceOnUse" id="clipPath21"
       ><path d="M0 0 L0 90 L100 90 L100 0 Z"
@@ -123,7 +123,7 @@
       ><path d="M0 0 L0 50 L160 50 L160 0 Z"
       /></clipPath
       ><clipPath clipPathUnits="userSpaceOnUse" id="clipPath40"
-      ><path d="M0 0 L0 110 L60 110 L60 0 Z"
+      ><path d="M0 0 L0 120 L60 120 L60 0 Z"
       /></clipPath
       ><clipPath clipPathUnits="userSpaceOnUse" id="clipPath41"
       ><path d="M0 0 L0 90 L90 90 L90 0 Z"
@@ -408,10 +408,10 @@
       >Structure of JSON file to configure the app with values to display</text
     ></g
     ><g fill="rgb(255,255,255)" fill-opacity="0" transform="translate(50,100)" stroke-opacity="0" stroke="rgb(255,255,255)"
-    ><rect x="0.5" width="198.5" height="108.5" y="0.5" clip-path="url(#clipPath20)" stroke="none"
+    ><rect x="0.5" width="198.5" height="98.5" y="0.5" clip-path="url(#clipPath20)" stroke="none"
     /></g
     ><g transform="translate(50,100)"
-    ><rect fill="none" x="0.5" width="198.5" height="108.5" y="0.5" clip-path="url(#clipPath20)"
+    ><rect fill="none" x="0.5" width="198.5" height="98.5" y="0.5" clip-path="url(#clipPath20)"
       /><text x="28" font-size="14px" y="18.1094" clip-path="url(#clipPath20)" font-family="sans-serif" stroke="none" xml:space="preserve"
       >BreezyConfiguration</text
       ><path fill="none" d="M1 24.1094 L199 24.1094" clip-path="url(#clipPath20)"
@@ -422,8 +422,6 @@
       ><text x="5" font-size="14px" y="71.4375" clip-path="url(#clipPath20)" font-family="sans-serif" stroke="none" xml:space="preserve"
       >ticksPerSecond : double</text
       ><text x="5" font-size="14px" y="87.5469" clip-path="url(#clipPath20)" font-family="sans-serif" stroke="none" xml:space="preserve"
-      >showBackButton : boolean</text
-      ><text x="5" font-size="14px" y="103.6562" clip-path="url(#clipPath20)" font-family="sans-serif" stroke="none" xml:space="preserve"
       >sampleLog: List&lt;String&gt;</text
     ></g
     ><g stroke-dasharray="8,5" stroke-miterlimit="5" transform="translate(320,530)" stroke-linecap="butt"
@@ -572,13 +570,13 @@
       ><text x="93.3193" font-size="14px" y="37.2188" clip-path="url(#clipPath39)" font-family="sans-serif" stroke="none" xml:space="preserve"
       >1..n</text
     ></g
-    ><g transform="translate(150,200)"
-    ><path fill="none" d="M10.5 11.5 L10.5 90.5" clip-path="url(#clipPath40)"
+    ><g transform="translate(150,190)"
+    ><path fill="none" d="M10.5 11.5 L10.5 100.5" clip-path="url(#clipPath40)"
       /><path d="M4 22.2583 L10.5 11 L17 22.2583 L10.5 33.0167 Z" clip-path="url(#clipPath40)" stroke="none"
       /><path fill="none" d="M4 22.2583 L10.5 11 L17 22.2583 L10.5 33.0167 Z" clip-path="url(#clipPath40)"
-      /><text x="14" font-size="14px" y="60.8906" clip-path="url(#clipPath40)" font-family="sans-serif" stroke="none" xml:space="preserve"
+      /><text x="14" font-size="14px" y="70.8906" clip-path="url(#clipPath40)" font-family="sans-serif" stroke="none" xml:space="preserve"
       >feed</text
-      ><text x="14" font-size="14px" y="74" clip-path="url(#clipPath40)" font-family="sans-serif" stroke="none" xml:space="preserve"
+      ><text x="14" font-size="14px" y="84" clip-path="url(#clipPath40)" font-family="sans-serif" stroke="none" xml:space="preserve"
       >1</text
     ></g
     ><g transform="translate(70,390)"

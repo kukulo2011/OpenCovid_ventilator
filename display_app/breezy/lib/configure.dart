@@ -111,18 +111,23 @@ abstract class BreezyConfiguration<C, TC> with _Commentable {
   /// Write out a compact representation, consisting of base64-encoded
   /// gzipped JSON, plus a Crc32 checksum.
   Future<void> writeCompact(IOSink sink) async {
-    String str = JsonEncoder().convert(await toJson(stripComments: true));
-    List<int> bytes = utf8.encode(str);
-    str = null;
-    bytes = gzip.encoder.convert(bytes);
+    List<int> bytes = await getCompactJson();
     int checksum = (Crc32()..add(bytes)).hash;
     sink.writeln('read-config-compact:${toHex(checksum, 8)}');
-    str = base64.encoder.convert(bytes);
+    String str = base64.encoder.convert(bytes);
     bytes = null;
     for (int i = 0; i < str.length; i += 72) {
       int end = min(i + 72, str.length);
       sink.writeln(str.substring(i, end));
     }
+  }
+
+// Get a compact representation, as a gzipped JSON
+  Future<List<int>> getCompactJson() async {
+    String str = JsonEncoder().convert(await toJson(stripComments: true));
+    List<int> bytes = utf8.encode(str);
+    str = null;
+    return gzip.encoder.convert(bytes);
   }
 }
 

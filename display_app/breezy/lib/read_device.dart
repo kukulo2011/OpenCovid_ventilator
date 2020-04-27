@@ -57,7 +57,7 @@ class DeviceData {
 abstract class DeviceDataListener {
   Future<void> processDeviceData(DeviceData d);
   Future<void> processNewConfiguration(
-      AndroidBreezyConfiguration c, DeviceDataSource nextSource);
+      AndroidBreezyConfiguration c, DeviceDataSource Function() nextSource);
   Future<void> processError(Exception ex);
   Future<void> processEOF();
 }
@@ -317,7 +317,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
     try {
       final newConfig = configReader.getResult();
       await _listener.processNewConfiguration(
-          newConfig, _makeNextDataSource(newConfig));
+          newConfig, () => _makeNextDataSource(newConfig));
     } catch (ex, st) {
       await send('\r\n\nStack trace:  $st\r\n\n');
       await send('Error in new config:  $ex\r\n\n');

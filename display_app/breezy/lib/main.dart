@@ -386,7 +386,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
             });
         src = r;
       } else if (r is Exception) {
-        showErrorDialog(context, 'Connection error', r);
+        await showErrorDialog(context, 'Connection error', r);
       } else {
         assert(r == null);
       }

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:charts_flutter/flutter.dart' as charts;
 import 'package:screen/screen.dart' show Screen;
 import 'package:pedantic/pedantic.dart';
+import 'configure_a.dart';
 import 'value_box.dart';
 import 'rolling_chart.dart';
 import 'dart:async';
+import 'package:collection/collection.dart' show ListEquality;
 import 'configure.dart' as config;
 import 'configure_a.dart' as config;
 import 'data_types.dart';
@@ -253,11 +255,33 @@ class _GraphsScreenState extends State<_GraphsScreen>
   @override
   Future<void> processNewConfiguration(
       config.AndroidBreezyConfiguration newConfig,
-      DeviceDataSource nextSource) async {
+      DeviceDataSource Function() nextSourceFunction) async {
+    if (globals.configuration is JsonBreezyConfiguration &&
+        globals.configuration.name == newConfig.name) {
+      // They might be the same.  If they are, no reason to save something
+      // we already have, and annoy the user by "switching" to what they're
+      // already seeing.
+      //
+      // It's a bit of a sleazy shortcut, but just generating the JSON
+      // to see if it's the same is easy and realiable.  This isn't a
+      // performance-critical operation, and actually implementing a
+      // deep equivalence test is fairly tedious and error-prone.  We compare
+      // the gzipped compact JSON.
+      final List<int> oldL = await globals.configuration.getCompactJson();
+      final List<int> newL = await newConfig.getCompactJson();
+      if (ListEquality<int>().equals(oldL, newL)) {
+        Scaffold.of(context).showSnackBar(SnackBar(
+            content: Text(
+                'Device sent a copy of the current configuration "${newConfig.name}"'),
+            duration: Duration(seconds: 5)));
+        return;
+      }
+    }
     await newConfig.save();
     globals.configuration = newConfig;
     globals.settings.configurationName = newConfig.name;
     await globals.settings.write();
+    final DeviceDataSource nextSource = nextSourceFunction();
     if (!_popCalled) {
       _popCalled = true;
       Navigator.of(context).pop(nextSource);
@@ -275,6 +299,11 @@ class _GraphsScreenState extends State<_GraphsScreen>
 
   @override
   Future<void> processEOF() async {
+    if (_lastErrorTime != null &&
+        DateTime.now().difference(_lastErrorTime).inSeconds > 30) {
+      // Stale notification.
+      _lastError = null;
+    }
     if (!_popCalled) {
       _popCalled = true;
       Navigator.of(context).pop(_lastError);
