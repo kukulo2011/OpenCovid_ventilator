@@ -139,8 +139,6 @@ class _GraphsScreenState extends State<_GraphsScreen>
   final HistoricalData _data;
   config.Screen screen;
   int screenNum;
-  Completer<void> _waitingForBuild;
-  DateTime _lastBuild = DateTime.now(); // never null
   final _WidgetBuilder _builder;
   bool _disposed = false;
   bool _popCalled = false;
@@ -193,7 +191,6 @@ class _GraphsScreenState extends State<_GraphsScreen>
     if (_screenOnCount == 0) {
       unawaited(Screen.keepOn(false));
     }
-    _notifyBuild();
   }
 
   /// Advance to the next screen in our configuration's list of screens.
@@ -202,15 +199,6 @@ class _GraphsScreenState extends State<_GraphsScreen>
       screenNum = (screenNum + 1) % globals.configuration.screens.length;
       screen = globals.configuration.screens[screenNum];
     });
-  }
-
-  void _notifyBuild() {
-    if (_waitingForBuild != null) {
-      final w = _waitingForBuild;
-      _waitingForBuild = null;
-      w.complete(null);
-    }
-    _lastBuild = DateTime.now();
   }
 
   @override
@@ -227,18 +215,10 @@ class _GraphsScreenState extends State<_GraphsScreen>
     setState(() {
       _data.receive(d);
     });
-    final delay = DateTime.now().difference(_lastBuild).inMilliseconds;
-    if (delay > 500 && _dataSource.running) {
-      final w = Completer<void>();
-      _waitingForBuild = w;
-      Log.writeln('Screen unbuilt for $delay ms:  Waiting for UI build.');
-      await w.future;
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    _notifyBuild();
     return OrientationBuilder(
         builder: (BuildContext context, Orientation orientation) {
       if (orientation == Orientation.portrait) {
