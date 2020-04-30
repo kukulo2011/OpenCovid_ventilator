@@ -16,6 +16,11 @@ a capacitive screen while wearing gloves is impractical.
 This code is offered under the [MIT License](LICENSE), which allows it to
 be used freely, but includes a strong liability disclaimer.
 
+## UPDATED DOCUMENTATION SOON
+
+Significantly improved documentation will be available here in a day
+or two (by May 1st).
+
 ## Platforrms
 
 This application targets all Android platforms on which Flutter is supported.
