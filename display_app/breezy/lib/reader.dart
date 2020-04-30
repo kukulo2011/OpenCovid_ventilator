@@ -287,7 +287,7 @@ class HttpReader extends ByteStreamReader {
   }
 }
 
-class ServerSocketReader extends ByteStreamReader {
+class ServerSocketReader extends ByteStreamReader implements DebugSink {
   ServerSocket _serverSocket;
   Socket _readingFrom;
 
@@ -363,18 +363,25 @@ class ServerSocketReader extends ByteStreamReader {
     _readingFrom?.destroy();
   }
 
-  /// Send an informative message down the socket to our client
+  // Implementing DebugSink.
+  @override
+  void writeln([Object msg = '']) {
+    _readingFrom.add(utf8.encode('$msg\r\n'));
+  }
+
+  /// Send an informative message down the socket to our client.  Null just
+  /// flushes.
   Future<void> send(String msg) {
     final s = _readingFrom;
-    if (s != null) {
-      try {
+    try {
+      if (s != null) {
         s.add(utf8.encode(msg));
-        return s.flush();
-      } catch (ex) {
-        Log.writeln('$ex sending to socket');
       }
+      return s.flush();
+    } catch (ex) {
+      Log.writeln('$ex sending to socket');
+      return Future<void>.value(null);
     }
-    return Future<void>.value(null);
   }
 
   IOSink getSink() => _readingFrom;

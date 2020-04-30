@@ -210,7 +210,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
       // Just a bit of robustness if we get flooded by comments
       return;
     } else if ('read-config' == line) {
-      configReader = BreezyConfigurationJsonReader(compact: false);
+      configReader = makeNewConfigReader();
       return;
     } else if (line.startsWith('meter-data:')) {
       _meterData = line.substring(11).trim().toLowerCase() != 'off';
@@ -220,8 +220,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
       try {
         int checksum = int.parse(line.substring(20), radix: 16);
         // The Linux crc32 command uses hex, so I did too.
-        configReader =
-            BreezyConfigurationJsonReader(compact: false, checksum: checksum);
+        configReader = makeNewConfigReader(compact: false, checksum: checksum);
       } catch (ex) {
         await send('Error in command:  $ex\r\n');
       }
@@ -312,6 +311,10 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
       Log.writeln('$ex for "$line"');
     }
   }
+
+  BreezyConfigurationJsonReader makeNewConfigReader(
+          {bool compact = false, int checksum}) =>
+      BreezyConfigurationJsonReader(compact: compact, checksum: checksum);
 
   Future<void> _configReaderDone() async {
     try {
@@ -449,6 +452,7 @@ class _ServerSocketDataSource extends _ByteStreamDataSource {
   final int portNumber;
   final String securityString;
   final BreezyConfiguration config;
+  bool debugMode = false;
   bool firstLineMatched = false;
   ServerSocketReader socketReader;
 
@@ -468,6 +472,7 @@ class _ServerSocketDataSource extends _ByteStreamDataSource {
   @override
   Future<void> reset() {
     firstLineMatched = false;
+    debugMode = false;
     configReader = null;
     return super.reset();
   }
@@ -490,6 +495,8 @@ class _ServerSocketDataSource extends _ByteStreamDataSource {
         await send('\r\n');
         await config.writeCompact(socketReader.getSink());
         await send('\r\n');
+      } else if (line == 'debug') {
+        debugMode = true;
       } else if (line == 'help') {
         await send('\r\n');
         await send('exit to close socket.\r\n');
@@ -504,6 +511,8 @@ class _ServerSocketDataSource extends _ByteStreamDataSource {
             '    Takes a base64-encoded gzipped JSON configuration, terminated by blank line.\r\n');
         await send(
             '    checksum is crc32 checksum of gzipped config file, in hex\r\n');
+        await send(
+            'debug to turn on debug for this connection.  Gives better JSON syntax errors.\r\n');
         await send('help for this message\r\n');
         await send('\r\n');
       } else {
@@ -515,6 +524,22 @@ class _ServerSocketDataSource extends _ByteStreamDataSource {
     } else {
       await send('Bad security string.\r\n');
       await Future.delayed(Duration(seconds: 5), () => null);
+    }
+  }
+
+  @override
+  BreezyConfigurationJsonReader makeNewConfigReader(
+      {bool compact = false, int checksum}) {
+    final DebugSink out = debugMode ? socketReader : null;
+    return BreezyConfigurationJsonReader(
+        compact: compact, checksum: checksum, debug: out);
+  }
+
+  @override
+  Future<void> _configReaderDone() async {
+    await super._configReaderDone();
+    if (debugMode) {
+      await send(null); // Essentially, flush(), for any debug output.
     }
   }
 }

@@ -23,8 +23,10 @@ class BreezyConfigurationJsonReader {
   final _source = StringBuffer();
   final bool compact;
   final int checksum;
+  final DebugSink debug;
 
-  BreezyConfigurationJsonReader({this.compact = false, this.checksum});
+  BreezyConfigurationJsonReader(
+      {this.compact = false, this.checksum, this.debug});
 
   void acceptLine(String line) {
     assert(!_done);
@@ -60,7 +62,7 @@ class BreezyConfigurationJsonReader {
     final json = jsonDecode(src) as Map<Object, Object>;
     _done = false;
     src = null;
-    return JsonBreezyConfiguration.fromJson(json);
+    return JsonBreezyConfiguration.fromJson(json, debug);
   }
 }
 
@@ -106,8 +108,10 @@ class JsonBreezyConfiguration extends AndroidBreezyConfiguration {
   }
 
   /// Throws various kinds of exceptions on malformed input
-  static JsonBreezyConfiguration fromJson(Map<Object, Object> jsonSrc) {
-    final json = JsonHelper<Color, charts.Color>(jsonSrc, AndroidColorHelper());
+  static JsonBreezyConfiguration fromJson(
+      Map<Object, Object> jsonSrc, DebugSink debug) {
+    final json = JsonHelper<Color, charts.Color>(jsonSrc, AndroidColorHelper(), debug);
+    json.debug?.start('BreeezyConfiguration');
     json.expect('type', 'BreezyConfiguration');
     final version = json['version'] as int;
     if (version != 2) {
@@ -115,11 +119,20 @@ class JsonBreezyConfiguration extends AndroidBreezyConfiguration {
     }
     final DataFeed<Color, charts.Color> Function(
         JsonHelper<Color, charts.Color>) decoder = DataFeed.fromJson;
-    return JsonBreezyConfiguration._constructor(
+    final r = JsonBreezyConfiguration._constructor(
         name: json['name'] as String,
         feed: json.decode('feed', decoder),
         screens: json.decodeList('screens', Screen.fromJson),
-        sampleLog: json.getList<String>('sampleLog'));
+        sampleLog: _getSampleLog(json));
+    json.debug?.end();
+    return r;
+  }
+
+  static List<String> _getSampleLog(JsonHelper json) {
+    json.debug?.start('sampleLog list:');
+    final r = json.getList<String>('sampleLog');
+    json.debug?.end();
+    return r;
   }
 
   @override
@@ -139,7 +152,7 @@ class JsonBreezyConfiguration extends AndroidBreezyConfiguration {
     bytes = null;
     final json = jsonDecode(src) as Map<Object, Object>;
     src = null;
-    return JsonBreezyConfiguration.fromJson(json);
+    return JsonBreezyConfiguration.fromJson(json, null);
   }
 
   static List<String> getStoredConfigurations() {

@@ -255,6 +255,7 @@ class DataFeed<C, TC> with _Commentable {
   }
 
   static DataFeed<C, TC> fromJson<C, TC>(JsonHelper<C, TC> json) {
+    json.debug?.start('DataFeed');
     json.expect('type', 'DataFeed');
     final valueIndex = _ValueIndex();
     Value<C, TC> makeValue(JsonHelper<C, TC> json, int index) {
@@ -277,7 +278,7 @@ class DataFeed<C, TC> with _Commentable {
     }
     assert(!chartedValues.any((v) => v == null));
     assert(!displayedValues.any((v) => v == null));
-    return DataFeed<C, TC>(
+    final r = DataFeed<C, TC>(
         protocolName: json['protocolName'] as String,
         protocolVersion: json['protocolVersion'] as int,
         timeModulus: json.getOrNull('timeModulus') as int,
@@ -290,6 +291,8 @@ class DataFeed<C, TC> with _Commentable {
         numFeedValues: values.length);
     // Thats one for "breezy", one for the version #, one for time,
     // one for the checksum, and one for the screen switch command, if present.
+    json.debug?.end();
+    return r;
   }
 
   List<WindowedData<ChartData>> createDeques() {
@@ -391,6 +394,7 @@ class Value<C, TC> with _Commentable {
 
   static Value<C, TC> _fromJson<C, TC>(
       JsonHelper<C, TC> json, _ValueIndex valueIndex, int feedIndex) {
+    json.debug?.start('Value');
     final type = json['type'] as String;
     final demoMinValue = (json['demoMinValue'] as num).toDouble();
     final demoMaxValue = (json['demoMaxValue'] as num).toDouble();
@@ -443,6 +447,7 @@ class Value<C, TC> with _Commentable {
     for (int i = 0; i < nd.length; i++) {
       v.displayers[i] = nd[i];
     }
+    json.debug?.end();
     return v;
   }
 }
@@ -561,21 +566,24 @@ class Screen<C, TC> with _Commentable {
       });
 
   static Screen<C, TC> fromJson<C, TC>(JsonHelper<C, TC> json, int index) {
+    json.debug?.start('Screen');
     json.expect('type', 'Screen');
-    var portrait = (json.getOrNull('portrait') == null)
-        ? null
-        : json.decode('portrait', ScreenWidget._fromJson) as ScreenContainer;
-    final landscape = (json.getOrNull('landscape') == null)
-        ? null
-        : json.decode('landscape', ScreenWidget._fromJson) as ScreenContainer;
+    var portrait = json.notNull('portrait')
+        ? json.decode('portrait', ScreenWidget._fromJson) as ScreenContainer
+        : null;
+    final landscape = json.notNull('landscape')
+        ? json.decode('landscape', ScreenWidget._fromJson) as ScreenContainer
+        : null;
     if (landscape == null && portrait == null) {
       throw ArgumentError('No portrait or landscape screen layout.');
     }
-    return Screen<C, TC>(
+    final r = Screen<C, TC>(
       name: json['name'] as String,
       portrait: portrait,
       landscape: landscape,
     )..init();
+    json.debug?.end();
+    return r;
   }
 }
 
@@ -600,16 +608,19 @@ abstract class DataDisplayer<C, TC> with _Commentable {
       return i;
     }
 
+    json.debug?.start('DataDisplayer');
     final type = json['type'];
+    DataDisplayer<C, TC> r;
     if (type == 'TimeChart') {
-      return TimeChart._fromJson<C, TC>(
-          json, indexFor(value, valueIndex.charted));
+      r = TimeChart._fromJson<C, TC>(json, indexFor(value, valueIndex.charted));
     } else if (type == 'ValueBox') {
-      return ValueBox._fromJson<C, TC>(
+      r = ValueBox._fromJson<C, TC>(
           json, indexFor(value, valueIndex.displayed));
     } else {
       throw ArgumentError('Bad DataDisplayer type $type');
     }
+    json.debug?.end();
+    return r;
   }
 }
 
@@ -656,6 +667,7 @@ class ValueBox<C, TC> extends DataDisplayer<C, TC> {
       });
 
   static ValueBox<C, TC> _fromJson<C, TC>(JsonHelper<C, TC> json, int index) {
+    json.debug?.start('ValueBox');
     assert(json['type'] == 'ValueBox');
     final ValueBox<C, TC> vb = ValueBox<C, TC>(
         id: json['id'] as String,
@@ -668,6 +680,7 @@ class ValueBox<C, TC> extends DataDisplayer<C, TC> {
         prefix: json.getOrNull('prefix') as String,
         postfix: json.getOrNull('postfix') as String);
     json.registerDisplayer(vb);
+    json.debug?.end();
     return vb;
   }
 
@@ -723,6 +736,7 @@ class TimeChart<C, TC> extends DataDisplayer<C, TC> {
       });
 
   static TimeChart<C, TC> _fromJson<C, TC>(JsonHelper<C, TC> json, int index) {
+    json.debug?.start('TimeChart');
     assert(json['type'] == 'TimeChart');
     final tc = TimeChart<C, TC>(
         id: json['id'] as String,
@@ -736,6 +750,7 @@ class TimeChart<C, TC> extends DataDisplayer<C, TC> {
         labelHeightFactor: (json['labelHeightFactor'] as num).toDouble(),
         mapper: json.dequeIndexMapper);
     json.registerDisplayer(tc);
+    json.debug?.end();
     return tc;
   }
 
@@ -781,35 +796,47 @@ abstract class ScreenWidget<C, TC> with _Commentable {
   Map<String, Object> toJson(ColorHelper<C, TC> helper, bool stripComments);
 
   static ScreenWidget<C, TC> _fromJson<C, TC>(JsonHelper<C, TC> json) {
+    json.debug?.start('ScreenWidget');
+    ScreenWidget<C, TC> r;
     switch (json['type'] as String) {
       case 'ScreenColumn':
-        return ScreenColumn<C, TC>(
+        r = ScreenColumn<C, TC>(
             flex: json['flex'] as int,
             content: json.decodeList('content', ScreenWidget._fromJsonInList));
+        break;
       case 'ScreenRow':
-        return ScreenRow<C, TC>(
+        r = ScreenRow<C, TC>(
             flex: json['flex'] as int,
             content: json.decodeList('content', ScreenWidget._fromJsonInList));
+        break;
       case 'Spacer':
-        return Spacer<C, TC>(json['flex'] as int);
+        r = Spacer<C, TC>(json['flex'] as int);
+        break;
       case 'Border':
-        return Border<C, TC>(
+        r = Border<C, TC>(
             width: (json['width'] as num).toDouble(),
             color: json.getColor('color'),
             flex: json.getOrNull('flex') as int);
+        break;
       case 'ScreenSwitchArrow':
-        return ScreenSwitchArrow<C, TC>(
+        r = ScreenSwitchArrow<C, TC>(
             flex: json['flex'] as int, color: json.getColor('color'));
+        break;
       case 'Label':
-        return Label<C, TC>(
+        r = Label<C, TC>(
             flex: json['flex'] as int,
             text: json['text'] as String,
             color: json.getColor('color'));
+        break;
       case 'DataWidget':
-        return DataWidget<C, TC>(
+        r = DataWidget<C, TC>(
             flex: json['flex'] as int, displayer: json.findDisplayer('dataID'));
+        break;
+      default:
+        throw ArgumentError('Unexpected type ${json['type']}');
     }
-    throw ArgumentError('Unexpected type ${json['type']}');
+    json.debug?.end();
+    return r;
   }
 
   static ScreenWidget<C, TC> _fromJsonInList<C, TC>(
@@ -1002,18 +1029,21 @@ class JsonHelper<C, TC> {
   final Map<Object, Object> json;
   final DequeIndexMapper dequeIndexMapper;
   final Map<String, DataDisplayer<C, TC>> displayers;
+  final DebugHelper debug;
   final ColorHelper<C, TC> colorHelper;
   static final Map<String, ValueAlignment> alignments =
       _populate<ValueAlignment>(ValueAlignment.values);
 
-  JsonHelper(this.json, this.colorHelper)
+  JsonHelper(this.json, this.colorHelper, DebugSink debug)
       : this.dequeIndexMapper = DequeIndexMapper(),
-        this.displayers = Map<String, DataDisplayer<C, TC>>();
+        this.displayers = Map<String, DataDisplayer<C, TC>>(),
+        this.debug = (debug == null) ? null : DebugHelper(debug);
 
   JsonHelper.child(this.json, JsonHelper<C, TC> parent)
       : this.dequeIndexMapper = parent.dequeIndexMapper,
         this.displayers = parent.displayers,
-        this.colorHelper = parent.colorHelper;
+        this.colorHelper = parent.colorHelper,
+        this.debug = parent.debug;
 
   static Map<String, T> _populate<T>(List<T> values) {
     final result = Map<String, T>();
@@ -1029,7 +1059,6 @@ class JsonHelper<C, TC> {
   }
 
   Object operator [](String key) {
-    if (!json.containsKey(key)) {}
     final v = getOrNull(key);
     if (v == null) {
       throw ArgumentError('$key not found');
@@ -1037,8 +1066,12 @@ class JsonHelper<C, TC> {
     return v;
   }
 
+  /// Determine if value null without debug output
+  bool notNull(String key) => json[key] != null;
+
   Object getOrNull(String key) {
     final v = json[key];
+    debug?.valueRead(key, v);
     if (v is Map) {
       return JsonHelper<C, TC>.child(v, this);
     } else {
@@ -1074,9 +1107,12 @@ class JsonHelper<C, TC> {
   List<E> decodeList<E>(
       String key, E decoder(JsonHelper<C, TC> json, int index)) {
     int i = 0;
-    return getList<Map<Object, Object>>(key)
+    debug?.start('$key list');
+    final r = getList<Map<Object, Object>>(key)
         .map((map) => decoder(JsonHelper<C, TC>.child(map, this), i++))
         .toList(growable: false);
+    debug?.end();
+    return r;
   }
 
   void registerDisplayer(DataDisplayer<C, TC> d) {
@@ -1094,4 +1130,39 @@ class JsonHelper<C, TC> {
     }
     return r;
   }
+}
+
+class DebugHelper {
+  final DebugSink out;
+  String _indent = '';
+
+  DebugHelper(this.out) {
+    assert(out != null);
+  }
+
+  void start(String s) {
+    out.writeln("$_indent$s:");
+    _indent = '$_indent. ';
+  }
+
+  void valueRead(String key, Object v) {
+    if (v == null || v is String || v is num || v is bool) {
+      out.writeln('$_indent$key : $v');
+    } else {
+      out.writeln('$_indent$key read');
+    }
+  }
+
+  void end() {
+    _indent = _indent.substring(0, _indent.length - 2);
+  }
+
+  void done() {
+    assert(_indent == '');
+  }
+}
+
+abstract class DebugSink {
+  /// Queue debug output for eventual presentation to the user.
+  void writeln([Object o]);
 }
