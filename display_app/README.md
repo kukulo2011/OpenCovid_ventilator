@@ -35,7 +35,7 @@ https://flutter.dev/docs/deployment/android#what-are-the-supported-target-archit
 
 The display and data feed can be configured with a straightforward file
 in a JSON syntax.  This is described in detail in
-[the configuration document](docs/configure.md).
+[the configuration document](breezy/docs/configure.md).
 
 <center>
 <img align="center" width="500" src="breezy/docs/images/new_config.png">
@@ -43,18 +43,15 @@ in a JSON syntax.  This is described in detail in
 
 ## Data Sources and Connecting to the Device
 
-<table><tr>
-<td>
+<img align="right" width="300" src="breezy/docs/images/input_menu.png">
+
 Breezy-Display supports communication via USB/Serial Port, Bluetooth/RFCOMM,
 an outgoing socket to a URL, or an incoming socket.  Once connected, there's
 a simple text protocol for sending data, and a small number of commands
-that the device can send to the display.  Details are available in
-[the protocol and commands document](docs/protocol_and_commands.md).
-</td>
-<td>
-<img align="right" width="300" src="breezy/docs/images/input_menu.png">
-</td>
-</tr></table>
+that the device can send to the display.  Details are available in 
+[the protocol and commands document](breezy/docs/protocol-and-commands.md).
+
+
 
 ## Building
 
@@ -68,7 +65,7 @@ If there are problems, `flutter doctor` might be helpful.
 flutter clean
 flutter build appbundle
 ```
-This makes a build for the Play Store.  Alternately,
+makes a build for the Play Store.  Alternately,
 ```
 flutter clean
 flutter build apk --split-per-abi
