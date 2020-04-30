@@ -13,24 +13,20 @@ No provision is made for control of the device.  For a ventilator this is
 inappropriate, because interacting with
 a capacitive screen while wearing gloves is impractical.
 
-This code is offered under the [MIT License](LICENSE), which allows it to
+This code and app are offered under the [MIT License](LICENSE), which allows it to
 be used freely, but includes a strong liability disclaimer.
 
-## UPDATED DOCUMENTATION SOON
 
-Significantly improved documentation will be available here in a day
-or two (by May 1st).
-
-## Platforrms
+## Platforms
 
 This application targets all Android platforms on which Flutter is supported.
 As of this writing, it has not been tried on iOS, but it should be possible
 to build it there.  All of the libraries it uses support iOS, with the
-exception of the bluetooth libraries.
+exception of the bluetooth libraries.  For the iPhone, the application should
+build and run, but this has not been tested.  Bluetooth support would require
+more work.
 
-though
-the bluetooth library so it should work
-on iPhone, but this has not been tested.  Flutter is available on Android devices
+Flutter is available on Android devices
 "armeabi-v7a (ARM 32-bit), arm64-v8a (ARM 64-bit), and x86-64 (x86 64-bit)."  Alas,
 "Flutter does not currently support building for x86 Android." - see 
 https://flutter.dev/docs/deployment/android#what-are-the-supported-target-architectures.
@@ -38,16 +34,34 @@ https://flutter.dev/docs/deployment/android#what-are-the-supported-target-archit
 ## Configuring the Display
 
 The display and data feed can be configured with a straightforward file
-in a JSON syntax.
+in a JSON syntax.  This is described in detail in
+[the configuration document](docs/configure.md).
+
+<center>
+<img align="center" width="500" src="breezy/docs/images/new_config.png">
+</center>
+
+## Data Sources and Connecting to the Device
+
+<table><tr>
+<td>
+Breezy-Display supports communication via USB/Serial Port, Bluetooth/RFCOMM,
+an outgoing socket to a URL, or an incoming socket.  Once connected, there's
+a simple text protocol for sending data, and a small number of commands
+that the device can send to the display.  Details are available in
+[the protocol and commands document](docs/protocol_and_commands.md).
+</td>
+<td>
+<img align="right" width="300" src="breezy/docs/images/input_menu.png">
+</td>
+</tr></table>
 
 ## Building
 
 Development is being done on Android Studio.  That's a big download and a lot of
 installation, though.  It should be possible to deploy and run if you have the
 Android SDK, and the [Flutter SDK](https://flutter.dev/docs/development/tools/sdk/releases).
-If there are problems, `flutter doctor` might be helpful.  If everything works, it should
-look like this:
-![Running from Command Line](misc/flutter_run.png)
+If there are problems, `flutter doctor` might be helpful.
 
 ### Commands used to build/deploy
 ```
@@ -59,13 +73,5 @@ This makes a build for the Play Store.  Alternately,
 flutter clean
 flutter build apk --split-per-abi
 ```
-makes APKs suitable for github
+makes APKs suitable for github.
 
-## Testing with a socket
-
-The application is designed to connect to an embedded system using
-a serial connection over USB.  In the future, it will be extended
-for Bluetooth connections.  It also allows a data source to connect
-a socket to the display device, which may be useful for debugging.
-See [`misc/send_data_to_display.sh`](misc/send_data_to_display.sh) for a Linux script to
-send a log file to the display device.
