@@ -1,27 +1,39 @@
 # Breezy Ventilator Display
-Display program for the Breezy emergency ventilator.
+Display program for embedded controllers, like the Breezy emergency ventilator.
 
 The main program in this directory is an Android/Flutter application that
-gathers data from the ventilator, and displays it in graphical and numeric
-form.  Control of the ventilator is not envisaged, because interacting with
+gathers data from an embedded device, and displays it in graphical and numeric
+form.  It is used for the Breezy Ventilator, but can be configured to display
+time-based data from any source.  Data can be sent over a USB serial cable,
+Bluetooth/RFCOMM, an outgoing socket, or an incoming socket.  A straightforward
+JSON file can be sent from the device (or anywhere else) to configure the
+appearance of the screen(s) and the nature of the data feed.
+
+No provision is made for control of the device.  For a ventilator this is
+inappropriate, because interacting with
 a capacitive screen while wearing gloves is impractical.
 
 This code is offered under the [MIT License](LICENSE), which allows it to
 be used freely, but includes a strong liability disclaimer.
 
-Once you've
-installed the app, and presumably switched the serial cable to the device under test, you
-should be able to run it.  The power button in the upper-right hand corner of the display
-screen does an `exit(0)` system call, which kills the process and should clean everything up.
-
 ## Platforrms
 
 This application targets all Android platforms on which Flutter is supported.
-As of this writing, all of the libraries support iOS as well, so it should work
+As of this writing, it has not been tried on iOS, but it should be possible
+to build it there.  All of the libraries it uses support iOS, with the
+exception of the bluetooth libraries.
+
+though
+the bluetooth library so it should work
 on iPhone, but this has not been tested.  Flutter is available on Android devices
 "armeabi-v7a (ARM 32-bit), arm64-v8a (ARM 64-bit), and x86-64 (x86 64-bit)."  Alas,
 "Flutter does not currently support building for x86 Android." - see 
 https://flutter.dev/docs/deployment/android#what-are-the-supported-target-architectures.
+
+## Configuring the Display
+
+The display and data feed can be configured with a straightforward file
+in a JSON syntax.
 
 ## Building
 
