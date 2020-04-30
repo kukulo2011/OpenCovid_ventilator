@@ -209,12 +209,12 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
       await Future.delayed(Duration(microseconds: 250), () => null);
       // Just a bit of robustness if we get flooded by comments
       return;
-    } else if ('read-config' == line) {
-      configReader = makeNewConfigReader();
-      return;
     } else if (line.startsWith('meter-data:')) {
       _meterData = line.substring(11).trim().toLowerCase() != 'off';
       Log.writeln('meterData set $_meterData from feed.');
+      return;
+    } else if ('read-config' == line) {
+      configReader = makeNewConfigReader();
       return;
     } else if (line.startsWith('read-config-compact:')) {
       try {

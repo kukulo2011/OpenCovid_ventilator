@@ -69,7 +69,7 @@ http://srecord.sourceforge.net/crc16-ccitt.html.
 Lines beginning with "#" will be treated as comments:  They will
 be discarded without logging a parse error.
 
-A line that consists entirely of the string `reset-clock` will reset
+A line that consists entirely of the string `reset-time` will reset
 the time calculation.  The next sample after this line will be displayed
 at a time 40 ms after the last sample, regardless of the time value.
 This can be useful e.g. for playing back captured data on a loop,

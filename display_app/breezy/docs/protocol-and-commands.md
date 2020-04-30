@@ -59,18 +59,42 @@ socket ("ss" in the table), since this is a handy way to debug.
 | Command | Availability | Function |
 |:--------|:-------------|----------|
 | `read-config` | all | The app receives a new JSON configuration.  The JSON may be split across multiple lines, and is terminated by a blank line. |
-| `read-config-compact:` | all | The app receives a new JSON configuration, sent as a base64-encoded gzip.  The command is followed by a checksum (after the colon), as a hex-encoded CRC32 value calculated over the binary gzipped value.  See `write-config-compact`. |
+| `read-config-compact:` | all | The app receives a new JSON configuration, sent as a base64-encoded gzip.  The command is followed by a checksum (after the colon), as a hex-encoded CRC32 value calculated over the binary gzipped value.  See `write-config-compact`.  With this command, a device can automatically configure Breezy-Display. |
+| `meter-data` | all | Causes Breezy to insert delays between data samples.  This shouldn't be done if a device is supplying data in real time, but it can be useful for sending a captured log or other file to the app. |
 | `reset-time` | all | Resets the app's notion of the current time.  This will cause the next data sample to be considered as arriving a short time after the last sample, regardless of its time value.  This is useful when replaying a log file in a loop.  The time gap between the two samples is about 40ms. |
-| `help` | ss | Displays a help message with available commands |
 | `next-url:` | url | Sets the next URL that will be opened when the current socket is closed by the server.  If unset, the app will stop displaying data when the connection closes. |
 | `write-config` | ss | Writes out the current app configuration to the socket. |
 | `write-config-compact` | ss |  Writes out a compact (base64 gzipped) version |
 | `debug` | ss | Turns on "debug" mode.  This can help when debugging JSON errors with `read-config`. |
 | `exit` | ss | close the current socket, and listen for a new connection |
+| `help` | ss | Displays a help message with available commands |
 
 ## Data Protocol
 
 An incoming will be discarded if the first character is "#".  Otherwise, it should consist of
-a number of fields, separated by commas.
+a number of fields, separated by commas, as follows:
 
-TODO
+| field | notes |
+|:----|----|
+| protocol-name | Name of the data protocol.  Set in configuration. |
+| protocol-version | Version number of the protocol.  Set in configuration.  |
+| time | Unsigned integer time value.  This is multiplied by a value set in the configuration to derive seconds.  It may wrap; the wrapping modulus is set in the configuration. |  
+| data* | zero or more data values, as set by the configuration. |
+| screen? | If `switchScreenCommand` is true in the command, this gives the name of the screen that should be shown.  This allows a device to control which screen is showing, perhaps on a periodic basis. |
+| checksum | An integer CRC-16 checksum value.  The value -1 is considered valid if `checksumIsOptional` is true in the configuration. |
+
+The checksum is calculated over the ASCII character values starting
+at the first character of `protocol_name` and ending with the comma
+before `checksum`. That final comma _is_ included in the checksum
+calculation.  The CRC algorithm is CRC-16-CCITT, as specified
+by [The CRC Wikipedia Page](https://en.wikipedia.org/wiki/Cyclic_redundancy_check).  Sample C code to calculate this can be found at
+http://srecord.sourceforge.net/crc16-ccitt.html.
+
+Data fields may be double (floating-point) numbers, or may be strings.  If strings, the
+follwing special escape sequences are recognized:
+
+* "`\\`" is converted to "`\`"
+* "`\c`" is converted to "`,`" (a comma)
+* "`\n`" is converted to a newline character
+
+Double values may be formatted in a variety of ways, according to the configuration.
