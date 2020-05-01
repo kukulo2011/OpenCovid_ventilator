@@ -58,7 +58,7 @@ socket ("ss" in the table), since this is a handy way to debug.
 
 | Command | Availability | Function |
 |:--------|:-------------|----------|
-| `read-config` | all | The app receives a new JSON configuration.  The JSON may be split across multiple lines, and is terminated by a blank line. |
+| `read-config` | all | The app receives a new JSON configuration.  The JSON may be split across multiple lines, and is terminated by a blank line.  The JSON format is given in [the configuration document](configure.md).|
 | `read-config-compact:` | all | The app receives a new JSON configuration, sent as a base64-encoded gzip.  The command is followed by a checksum (after the colon), as a hex-encoded CRC32 value calculated over the binary gzipped value.  See `write-config-compact`.  With this command, a device can automatically configure Breezy-Display. |
 | `meter-data` | all | Causes Breezy to insert delays between data samples.  This shouldn't be done if a device is supplying data in real time, but it can be useful for sending a captured log or other file to the app. |
 | `reset-time` | all | Resets the app's notion of the current time.  This will cause the next data sample to be considered as arriving a short time after the last sample, regardless of its time value.  This is useful when replaying a log file in a loop.  The time gap between the two samples is about 40ms. |
@@ -69,9 +69,9 @@ socket ("ss" in the table), since this is a handy way to debug.
 | `exit` | ss | close the current socket, and listen for a new connection |
 | `help` | ss | Displays a help message with available commands |
 
-## Data Protocol
+## <a name="protocol">Data Protocol</a>
 
-An incoming will be discarded if the first character is "#".  Otherwise, it should consist of
+An incoming line will be discarded if the first character is "#".  Otherwise, it should consist of
 a number of fields, separated by commas, as follows:
 
 | field | notes |

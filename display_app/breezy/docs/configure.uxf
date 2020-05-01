@@ -7,13 +7,12 @@
       <x>50</x>
       <y>100</y>
       <w>200</w>
-      <h>100</h>
+      <h>80</h>
     </coordinates>
     <panel_attributes>BreezyConfiguration
 --
 version: 1
 name : String
-ticksPerSecond : double
 sampleLog: List&lt;String&gt;
 </panel_attributes>
     <additional_attributes/>
@@ -48,14 +47,15 @@ name : String</panel_attributes>
     <id>UMLClass</id>
     <coordinates>
       <x>80</x>
-      <y>290</y>
+      <y>270</y>
       <w>240</w>
-      <h>110</h>
+      <h>130</h>
     </coordinates>
     <panel_attributes>DataFeed
 --
 protocolName
 protocolVersion
+ticksPerSecond : double
 timeModulus : int
 checksumIsOptional : bool
 screenSwitchCommand : bool
@@ -92,7 +92,7 @@ m2=values\n0..n</panel_attributes>
     <id>Relation</id>
     <coordinates>
       <x>150</x>
-      <y>190</y>
+      <y>170</y>
       <w>60</w>
       <h>120</h>
     </coordinates>
