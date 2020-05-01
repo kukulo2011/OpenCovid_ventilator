@@ -60,7 +60,7 @@ socket ("ss" in the table), since this is a handy way to debug.
 |:--------|:-------------|----------|
 | `read-config` | all | The app receives a new JSON configuration.  The JSON may be split across multiple lines, and is terminated by a blank line.  The JSON format is given in [the configuration document](configure.md).|
 | `read-config-compact:` | all | The app receives a new JSON configuration, sent as a base64-encoded gzip.  The command is followed by a checksum (after the colon), as a hex-encoded CRC32 value calculated over the binary gzipped value.  See `write-config-compact`.  With this command, a device can automatically configure Breezy-Display. |
-| `meter-data` | all | Causes Breezy to insert delays between data samples.  This shouldn't be done if a device is supplying data in real time, but it can be useful for sending a captured log or other file to the app. |
+| <a name="meter">`meter-data`</a> | all | Causes Breezy to insert delays between data samples.  This shouldn't be done if a device is supplying data in real time, but it can be useful for sending a captured log or other file to the app. |
 | `reset-time` | all | Resets the app's notion of the current time.  This will cause the next data sample to be considered as arriving a short time after the last sample, regardless of its time value.  This is useful when replaying a log file in a loop.  The time gap between the two samples is about 40ms. |
 | `next-url:` | url | Sets the next URL that will be opened when the current socket is closed by the server.  If unset, the app will stop displaying data when the connection closes. |
 | `write-config` | ss | Writes out the current app configuration to the socket. |
@@ -71,7 +71,8 @@ socket ("ss" in the table), since this is a handy way to debug.
 
 ## <a name="protocol">Data Protocol</a>
 
-An incoming line will be discarded if the first character is "#".  Otherwise, it should consist of
+An incoming line will be discarded if the first character is "#".  Otherwise, 
+it should be a data sample that consists of
 a number of fields, separated by commas, as follows:
 
 | field | notes |
@@ -79,7 +80,7 @@ a number of fields, separated by commas, as follows:
 | protocol-name | Name of the data protocol.  Set in configuration. |
 | protocol-version | Version number of the protocol.  Set in configuration.  |
 | time | Unsigned integer time value.  This is multiplied by a value set in the configuration to derive seconds.  It may wrap; the wrapping modulus is set in the configuration. |  
-| data* | zero or more data values, as set by the configuration. |
+| data\* | zero or more data values, as set by the configuration. |
 | screen? | If `switchScreenCommand` is true in the command, this gives the name of the screen that should be shown.  This allows a device to control which screen is showing, perhaps on a periodic basis. |
 | checksum | An integer CRC-16 checksum value.  The value -1 is considered valid if `checksumIsOptional` is true in the configuration. |
 
