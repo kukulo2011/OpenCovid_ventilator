@@ -72,7 +72,7 @@ socket ("ss" in the table), since this is a handy way to debug.
 ## <a name="protocol">Data Protocol</a>
 
 An incoming line will be discarded if the first character is "#".  Otherwise, 
-it should be a data sample that consists of
+it should be a __data sample__ that consists of
 a number of fields, separated by commas, as follows:
 
 | field | notes |

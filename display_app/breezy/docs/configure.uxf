@@ -194,7 +194,7 @@ flex : int
       <x>520</x>
       <y>440</y>
       <w>220</w>
-      <h>180</h>
+      <h>160</h>
     </coordinates>
     <panel_attributes>/TimeChart/
 --
@@ -202,7 +202,6 @@ rolling : bool
 minValue : double
 maxValue : double
 timeSpan : double
-maxNumValues : int
 displayedTimeTicks : int
 color : String
 label : String
@@ -526,7 +525,7 @@ demoMaxValue : double</panel_attributes>
       <h>50</h>
     </coordinates>
     <panel_attributes>All JSON values may have a List&lt;String&gt; comment.
-It is not read in.
+It is not retained by the app.
 bg=yellow</panel_attributes>
     <additional_attributes/>
   </element>

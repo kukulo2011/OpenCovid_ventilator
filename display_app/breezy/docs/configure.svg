@@ -45,7 +45,7 @@
       ><path d="M0 0 L0 160 L290 160 L290 0 Z"
       /></clipPath
       ><clipPath clipPathUnits="userSpaceOnUse" id="clipPath14"
-      ><path d="M0 0 L0 180 L220 180 L220 0 Z"
+      ><path d="M0 0 L0 160 L220 160 L220 0 Z"
       /></clipPath
       ><clipPath clipPathUnits="userSpaceOnUse" id="clipPath15"
       ><path d="M0 0 L0 50 L100 50 L100 0 Z"
@@ -165,7 +165,7 @@
       /><text x="5" font-size="14px" y="18.1094" clip-path="url(#clipPath4)" font-family="sans-serif" stroke="none" xml:space="preserve"
       >All JSON values may have a List&lt;String&gt; comment.</text
       ><text x="5" font-size="14px" y="34.2188" clip-path="url(#clipPath4)" font-family="sans-serif" stroke="none" xml:space="preserve"
-      >It is not read in.</text
+      >It is not retained by the app.</text
     ></g
     ><g fill="rgb(255,255,255)" fill-opacity="0" transform="translate(140,420)" stroke-opacity="0" stroke="rgb(255,255,255)"
     ><rect x="0.5" width="188.5" height="58.5" y="0.5" clip-path="url(#clipPath5)" stroke="none"
@@ -290,10 +290,10 @@
       >align: enum - left, center, right, decimal</text
     ></g
     ><g fill="rgb(255,255,255)" fill-opacity="0" transform="translate(520,440)" stroke-opacity="0" stroke="rgb(255,255,255)"
-    ><rect x="0.5" width="218.5" height="178.5" y="0.5" clip-path="url(#clipPath14)" stroke="none"
+    ><rect x="0.5" width="218.5" height="158.5" y="0.5" clip-path="url(#clipPath14)" stroke="none"
     /></g
     ><g transform="translate(520,440)"
-    ><rect fill="none" x="0.5" width="218.5" height="178.5" y="0.5" clip-path="url(#clipPath14)"
+    ><rect fill="none" x="0.5" width="218.5" height="158.5" y="0.5" clip-path="url(#clipPath14)"
       /><text x="73" font-size="14px" y="18.1094" clip-path="url(#clipPath14)" font-family="sans-serif" font-style="italic" stroke="none" xml:space="preserve"
       >TimeChart</text
       ><path fill="none" d="M1 24.1094 L219 24.1094" clip-path="url(#clipPath14)"
@@ -306,14 +306,12 @@
       ><text x="5" font-size="14px" y="87.5469" clip-path="url(#clipPath14)" font-family="sans-serif" stroke="none" xml:space="preserve"
       >timeSpan : double</text
       ><text x="5" font-size="14px" y="103.6562" clip-path="url(#clipPath14)" font-family="sans-serif" stroke="none" xml:space="preserve"
-      >maxNumValues : int</text
-      ><text x="5" font-size="14px" y="119.7656" clip-path="url(#clipPath14)" font-family="sans-serif" stroke="none" xml:space="preserve"
       >displayedTimeTicks : int</text
-      ><text x="5" font-size="14px" y="135.875" clip-path="url(#clipPath14)" font-family="sans-serif" stroke="none" xml:space="preserve"
+      ><text x="5" font-size="14px" y="119.7656" clip-path="url(#clipPath14)" font-family="sans-serif" stroke="none" xml:space="preserve"
       >color : String</text
-      ><text x="5" font-size="14px" y="151.9844" clip-path="url(#clipPath14)" font-family="sans-serif" stroke="none" xml:space="preserve"
+      ><text x="5" font-size="14px" y="135.875" clip-path="url(#clipPath14)" font-family="sans-serif" stroke="none" xml:space="preserve"
       >label : String</text
-      ><text x="5" font-size="14px" y="168.0938" clip-path="url(#clipPath14)" font-family="sans-serif" stroke="none" xml:space="preserve"
+      ><text x="5" font-size="14px" y="151.9844" clip-path="url(#clipPath14)" font-family="sans-serif" stroke="none" xml:space="preserve"
       >labelHeightFactor: double</text
     ></g
     ><g fill="rgb(255,255,255)" fill-opacity="0" transform="translate(500,190)" stroke-opacity="0" stroke="rgb(255,255,255)"
