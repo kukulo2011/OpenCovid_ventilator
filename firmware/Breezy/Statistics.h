@@ -10,7 +10,7 @@ class Statistics{
   float slm_sum; // volume (ml)
   float p_peak; // peak pressure (cmH2O)
   float p_mean; // mean pressure (cmH2O)
-  float peep; // positive end-expiratory pressure
+  float peep; // positive end-expiratory pressure (cmH2O)
   float rr; // respiratory rate
   float o2_perc; // O2 concentration
   float ti; // inspiration time (s)

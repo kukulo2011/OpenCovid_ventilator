@@ -7,7 +7,7 @@
 class Sensors{
   public:
   float p_act; // actual pressure (cmH2O)
-  float p_o2; // O2 supply pressure 
+  float p_o2; // O2 supply pressure (kPa)
   float slm; // flow (l/min)
   float o2_perc; // O2 concentration
 

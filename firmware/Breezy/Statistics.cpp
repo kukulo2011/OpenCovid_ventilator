@@ -41,6 +41,11 @@ uint8_t Statistics::poll(void)
   if(mil - last_poll < (uint32_t)STATISTICS_PERIOD_MS){ // it is not the time yet
     return 0;
   }
+
+  if ( xSemaphoreTake( xStatisticsSemaphore, ( TickType_t ) 5 ) == pdFALSE )
+  {
+    return 0;
+  }
   
   last_poll += (uint32_t)STATISTICS_PERIOD_MS;
 
@@ -48,6 +53,7 @@ uint8_t Statistics::poll(void)
   sensors.measure();
   
   p_act = sensors.p_act; // actual pressure (cmH2O)
+  p_o2 = sensors.p_o2; // oxygen pressure (kPa)
   slm = sensors.slm; // flow (l/min)
   float dv_ml_s = slm * 1000 / 60; // actual flow in milliliters per second 
   float dv_ml = dv_ml_s * ((float)STATISTICS_PERIOD_MS) / 1000; // volume per measurement period
@@ -110,7 +116,7 @@ uint8_t Statistics::poll(void)
   float slm_sum; // volume (ml)
   
   
-  
+  xSemaphoreGive( xStatisticsSemaphore ); 
   return 1;
   
 }

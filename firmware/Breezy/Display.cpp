@@ -48,13 +48,21 @@ Display display;
 
 U8GLIB_ST7920_128X64_1X u8g(LCD_EN_PIN, LCD_RW_PIN, LCD_DI_PIN);  // SPI Com: SCK = en = 23, MOSI = rw = 17, CS = di = 16
 
+float p = 0; // TODO remove
 
 void draw(void) {
   uint8_t msg[40] = "";
   // graphic commands to redraw the complete screen should be placed here  
+
+// TODO remove
+  u8g.setFont(u8g_font_osb21);
+  dtostrf(p, 5, 0, msg);
+  strcat(msg, " kPa");
+  u8g.drawStr( 0, 63, msg);
+
+  
   u8g.setFont(u8g_font_5x7);
   //u8g.setFont(u8g_font_osb21);
-  
 
   sprintf(msg, "Ppeak" );
   dtostrf(statistics.p_peak, 5, 1, &msg[strlen(msg)]);
@@ -106,6 +114,9 @@ void draw(void) {
   sprintf(msg, "VTe" );
   dtostrf(statistics.vte, 5, 0, &msg[strlen(msg)]);
   u8g.drawStr( 64, 35, msg);
+
+
+  
 }
 
 
@@ -149,6 +160,8 @@ void Display::init(void) {
 }
 
 void Display::hello(void) {
+
+  p = statistics.p_o2;
 
   u8g.firstPage();  
   do {

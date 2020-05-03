@@ -1,6 +1,7 @@
 #include <Arduino_FreeRTOS.h>
 #include <semphr.h>  // add the FreeRTOS functions for Semaphores (or Flags).
 extern SemaphoreHandle_t xSerialSemaphore;
+extern SemaphoreHandle_t xStatisticsSemaphore;
 
 // Message time granularity
 #define MESSAGE_PERIOD_MS (50)
@@ -42,3 +43,26 @@ extern SemaphoreHandle_t xSerialSemaphore;
 #define LCD_EN_PIN 23
 #define LCD_RW_PIN 17
 #define LCD_DI_PIN 16
+
+// VALVES wiring
+#define VALVE_A_PIN 4
+#define VALVE_B_PIN 5
+#define VALVE_C_PIN 6
+#define VALVE_D_PIN 11
+
+#define valve_A_close() digitalWrite(VALVE_A_PIN, LOW)
+#define valve_B_close() digitalWrite(VALVE_B_PIN, LOW)
+#define valve_C_close() digitalWrite(VALVE_C_PIN, HIGH)
+#define valve_D_close() digitalWrite(VALVE_D_PIN, HIGH)
+
+#define valve_A_open() digitalWrite(VALVE_A_PIN, HIGH)
+#define valve_B_open() digitalWrite(VALVE_B_PIN, HIGH)
+#define valve_C_open() digitalWrite(VALVE_C_PIN, LOW)
+#define valve_D_open() digitalWrite(VALVE_D_PIN, LOW)
+
+
+
+  
+  
+  
+  
