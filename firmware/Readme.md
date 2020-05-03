@@ -10,7 +10,12 @@ To control the main ventilator parameteres, there wil be several potentiometers 
 The on-line charts of pressure, flow and volume will be available via [Android app](../display_app).
 
 ## Installation
-Use Arduino IDE. Open Breezy.ino to compile the code and flash the Arduino Mega. No need to add any libraries. To use the app, connect the usb cable to your phone/tablet with the app installed.
+Use Arduino IDE. Open Breezy.ino to compile the code and flash the Arduino Mega. 
+In Arduino IDE add the following libraries:
+ * FreeRTOS by Richard Barry
+ * U8glib
+
+To use the app, connect the usb cable to your phone/tablet with the app installed.
 
 ### Sensors
 

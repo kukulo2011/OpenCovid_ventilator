@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 if [ $# != 4 ] ; then
     base="`dirname $0`"
@@ -19,10 +19,11 @@ if [ $# != 4 ] ; then
 fi
 
 security=$1
-addr=$2
+host=$2
 port=$3
 file=$4
 
 
-(echo "foo" ; cat ../../firmware/Misc/example_measurements/breezy-example3.log; echo ""; echo "exit") | nc localhost 7777
+(echo "$security" ; echo "meter-data:on"; cat $file; echo ""; echo "exit") \
+        | nc $host $port
 

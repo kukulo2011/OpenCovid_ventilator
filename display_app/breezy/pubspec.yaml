@@ -1,7 +1,7 @@
 name: breezy
 description: Breezy - Emergency Ventilator Display
 
-version: 1.1.1+2        # After '+' is the version code, for the app store
+version: 0.3.0+7        # After '+' is the version code, for the app store
 
 environment:
   sdk: ">=2.1.0 <3.0.0"
@@ -13,11 +13,25 @@ dependencies:
   connectivity: ^0.4.8+2
   charts_flutter: ^0.9.0
   pedantic: ^1.8.0
+  collection: ^1.14.11
   screen: ^0.0.5
+  package_info: '>=0.4.0+17 <2.0.0'
   intl: ^0.16.1
   path_provider: ^1.6.5
-    # https://pub.dev/packages/flutter_blue is a good candidate if we want
-    # to add bluetooth support
+  quiver: ^2.0.5
+  url_launcher: ^5.4.5
+  path: ^1.6.4
+  archive: ^2.0.11
+  flutter_bluetooth_serial: ^0.2.2
+      # Android-only support for Bluetooth Classic.  iOS apparently doesn't support
+      # Bluetooth Classic at all.  Some work might be required to ensure graceful
+      # failure on iOS; as of this writing, this hasn't been tested.
+
+
+      # https://pub.dev/packages/flutter_blue is a good candidate if we want
+      # to add bluetoothi LE support.  However, see
+      # https://github.com/pauldemarco/flutter_blue/issues/531
+
 
 dev_dependencies:
   flutter_test:
@@ -27,7 +41,7 @@ dev_dependencies:
 flutter_icons:
     android: 'launcher_icon'
     ios: true
-    image_path: assets/breeze_icon_with_background_512x512.png
+    image_path: assets/breeze_icon_with_background_128x128.png
     # If changed, "flutter pub run flutter_launcher_icons:main"
     # See https://pub.dev/packages/flutter_launcher_icons
 
@@ -44,6 +58,8 @@ flutter:
   assets:
     - assets/demo.log
     - assets/breeze_icon_white_256x256.png
+    - assets/breeze_icon_with_background_128x128.png
+    - assets/LICENSE.txt
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware.
