@@ -22,6 +22,16 @@ class Statistics{
   float vte; // volume tidal expiration (ml)
 
   float p_o2; // O2 supply pressure
+  
+  //potentiometer settings
+  float set_o2; // O2 concentration (21 to 100) %
+  float set_max_p; // Max. Pressure (10 to 40) cmH2O
+  float set_peep; // PEEP pressure (5 to 20) cmH2O
+  float set_rr; // respiratory rate (12 to 20) / min
+  float set_tv; // Tidal volume (200 - 1000) ml 
+  float set_ie; // Inspiration : Expiration, 
+  
+  uint8_t is_inspiration_from_automat; // automatic breathing sets this variable
 
   uint8_t is_i; // is inspiration - debug
   

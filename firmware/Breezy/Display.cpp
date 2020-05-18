@@ -44,6 +44,7 @@
 #include "Statistics.h"
 
 
+
 Display display;
 
 U8GLIB_ST7920_128X64_1X u8g(LCD_EN_PIN, LCD_RW_PIN, LCD_DI_PIN);  // SPI Com: SCK = en = 23, MOSI = rw = 17, CS = di = 16
@@ -55,11 +56,12 @@ void draw(void) {
   // graphic commands to redraw the complete screen should be placed here  
 
 // TODO remove
+/*
   u8g.setFont(u8g_font_osb21);
   dtostrf(p, 5, 0, msg);
   strcat(msg, " kPa");
   u8g.drawStr( 0, 63, msg);
-
+*/
   
   u8g.setFont(u8g_font_5x7);
   //u8g.setFont(u8g_font_osb21);
@@ -80,14 +82,25 @@ void draw(void) {
   dtostrf(statistics.rr, 5, 0, &msg[strlen(msg)]);
   u8g.drawStr( 0, 28, msg);
 
-  sprintf(msg, "O2per" );
-  dtostrf(statistics.o2_perc, 5, 0, &msg[strlen(msg)]);
-  u8g.drawStr( 0, 35, msg);
-
   sprintf(msg, "Ti   " );
-  dtostrf(statistics.ti, 5, 2, &msg[strlen(msg)]);
+  dtostrf(statistics.ti, 5, 0, &msg[strlen(msg)]);
+  u8g.drawStr( 0, 35, msg);
   
   
+  
+  sprintf(msg, "sMaxP" );
+  dtostrf(statistics.set_max_p, 5, 0, &msg[strlen(msg)]);
+  u8g.drawStr( 0, 45, msg); 
+  
+  sprintf(msg, "sPEEP" );
+  dtostrf(statistics.set_peep, 5, 0, &msg[strlen(msg)]);
+  u8g.drawStr( 0, 52, msg);  
+  
+  sprintf(msg, "s VTi" );
+  dtostrf(statistics.set_tv, 5, 0, &msg[strlen(msg)]);
+  u8g.drawStr( 0, 59, msg);
+ 
+ 
   if(statistics.i_e > 1){
     sprintf(msg, "I:E  " );
     dtostrf(statistics.i_e, 0, 1, &msg[strlen(msg)]);
@@ -114,8 +127,28 @@ void draw(void) {
   sprintf(msg, "VTe" );
   dtostrf(statistics.vte, 5, 0, &msg[strlen(msg)]);
   u8g.drawStr( 64, 35, msg);
+  
+  
+  sprintf(msg, "s I:E" );
+  if(statistics.set_ie > 1){
+    sprintf(msg, "I:E  " );
+    dtostrf(statistics.set_ie, 0, 1, &msg[strlen(msg)]);
+    sprintf(&msg[strlen(msg)], ":1" );
+  }else{
+    sprintf(msg, "I:E  1:" );
+    dtostrf(1.0 / statistics.set_ie, 0, 1, &msg[strlen(msg)]);
+  }
+  u8g.drawStr( 64, 45, msg);
 
-
+  
+  sprintf(msg, "s RR " );
+  dtostrf(statistics.set_rr, 5, 0, &msg[strlen(msg)]);
+  u8g.drawStr( 64, 52, msg);  
+ 
+  
+  sprintf(msg, "s FiO2" );
+  dtostrf(statistics.set_o2, 5, 0, &msg[strlen(msg)]);
+  u8g.drawStr( 64, 59, msg);
   
 }
 

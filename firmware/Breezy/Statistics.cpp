@@ -8,6 +8,7 @@ Statistics statistics;
 void Statistics::init(void)
 {
   sensors.init();
+  is_inspiration_from_automat = 0;
 
   vti_int = 0; // vti integrator
   vte_int = 0; // vte integrator
@@ -22,11 +23,17 @@ uint8_t Statistics::is_inspiration(void)
 {
   uint32_t mil = millis();
   static uint8_t insp = 0;
-  if((slm > (float)INSPIRATION_FLOW_DETECT_TRIGGER) && (mil - last_exp_started_ms > MIN_EXPIRATION_TIME_MS)){
-    insp = 1;
-  }else if((slm < -((float)INSPIRATION_FLOW_DETECT_TRIGGER))  && (mil - last_insp_started_ms > MIN_INSPIRATION_TIME_MS)){
-    insp = 0;
-  } 
+  
+  if(1){ // automat determines breathing start/stop. No need to assess.
+      insp = is_inspiration_from_automat;
+  }else{ // free breathing through flow sensor (only for experiment)
+    if((slm > (float)INSPIRATION_FLOW_DETECT_TRIGGER) && (mil - last_exp_started_ms > MIN_EXPIRATION_TIME_MS)){
+      insp = 1;
+    }else if((slm < -((float)INSPIRATION_FLOW_DETECT_TRIGGER))  && (mil - last_insp_started_ms > MIN_INSPIRATION_TIME_MS)){
+      insp = 0;
+    } 
+  }  
+  
   return insp;
 }
 
@@ -51,6 +58,13 @@ uint8_t Statistics::poll(void)
 
   
   sensors.measure();
+  
+  set_o2 = sensors.set_o2; // O2 concentration (21 to 100) %
+  set_max_p = sensors.set_max_p; // Max. Pressure (10 to 40) cmH2O
+  set_peep = sensors.set_peep; // PEEP pressure (5 to 20) cmH2O
+  set_rr = sensors.set_rr; // respiratory rate (12 to 20) / min
+  set_tv = sensors.set_tv; // Tidal volume (200 - 1000) ml 
+  set_ie = sensors.set_ie; // Inspiration : Expiration, 
   
   p_act = sensors.p_act; // actual pressure (cmH2O)
   p_o2 = sensors.p_o2; // oxygen pressure (kPa)

@@ -39,6 +39,49 @@ extern SemaphoreHandle_t xStatisticsSemaphore;
 #define P_O2_MINOUTP (10)
 #define P_O2_MAXOUTP (700) // kPa
 
+// Potentiometer for O2 concentration settings
+#define SET_O2_PIN A2
+#define SET_O2_MINVOLT (0)
+#define SET_O2_MAXVOLT (5)
+#define SET_O2_MINOUTP (21)
+#define SET_O2_MAXOUTP (100) // % O2
+
+
+// Potentiometer for Max. Pressure (10 to 40) cmH2O
+#define SET_MAX_P_PIN A1
+#define SET_MAX_P_MINVOLT (0)
+#define SET_MAX_P_MAXVOLT (5)
+#define SET_MAX_P_MINOUTP (10)
+#define SET_MAX_P_MAXOUTP (40) // kPa
+
+// Potentiometer for PEEP Pressure (5 to 20) cmH2O
+#define SET_PEEP_PIN A0
+#define SET_PEEP_MINVOLT (0)
+#define SET_PEEP_MAXVOLT (5)
+#define SET_PEEP_MINOUTP (5)
+#define SET_PEEP_MAXOUTP (20) // kPa
+
+// Potentiometer for respiratory rate (12 to 20) / min
+#define SET_RR_PIN A7
+#define SET_RR_MINVOLT (0)
+#define SET_RR_MAXVOLT (5)
+#define SET_RR_MINOUTP (12)
+#define SET_RR_MAXOUTP (20) // b / min
+
+// Potentiometer for tidal volume (200 to 1000) ml
+#define SET_TV_PIN A8
+#define SET_TV_MINVOLT (0)
+#define SET_TV_MAXVOLT (5)
+#define SET_TV_MINOUTP (200)
+#define SET_TV_MAXOUTP (1000) // ml
+
+// Potentiometer for I:E ratio (1 to 0.33)
+#define SET_IE_PIN A6
+#define SET_IE_MINVOLT (0)
+#define SET_IE_MAXVOLT (5)
+#define SET_IE_MINOUTP (1)
+#define SET_IE_MAXOUTP (0.33) // 
+
 // LCD wiring (According to RAMPS and Reprap discount smart controller)
 #define LCD_EN_PIN 23
 #define LCD_RW_PIN 17

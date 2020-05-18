@@ -146,6 +146,8 @@ void TaskVentilator( void *pvParameters __attribute__((unused)) )  // This is a 
 
 void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
 {
+    
+    
   float peep_target = 10;
   float bottle_kPa_target = 180;
   float lung_pressure_target_cmH20 = 30;
@@ -155,6 +157,7 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
   for (;;)
   {
     // expiration phase
+    statistics.is_inspiration_from_automat = 0;
     valve_C_close();
     valve_A_open();
     valve_B_open();
@@ -168,6 +171,11 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
       }
       p_act = statistics.p_act;
       p_o2 = statistics.p_o2;
+      
+      peep_target = statistics.set_peep;
+      bottle_kPa_target = 1/statistics.set_ie * 50 + 100; // 100 kPa -only for testing... range 150 to 250 kPa in bottle
+      lung_pressure_target_cmH20 = statistics.set_max_p;
+      
       xSemaphoreGive( xStatisticsSemaphore );
       
       if(p_act <= peep_target){ // peep
@@ -186,8 +194,11 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
     
     // PEEP -delay phase
     vTaskDelay(50);
-
+    
     // inspiration phase
+    statistics.is_inspiration_from_automat = 1;    
+    vTaskDelay(2); // let the Statistics do the PEEP measurement
+
     valve_C_open();
 
 
