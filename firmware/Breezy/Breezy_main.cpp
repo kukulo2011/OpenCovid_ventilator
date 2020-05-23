@@ -150,20 +150,27 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
     
   float peep_target = 10;
   float bottle_kPa_target = 180;
+  float bottle_p_begin = 0;
+  float bottle_p_o2_target; 
+  float bottle_p_range;
   float lung_pressure_target_cmH20 = 30;
 
-  float p_act, p_o2;
+  float p_act, p_o2, set_tv, slm_sum, set_rr, set_o2;
+  
+  uint32_t last_insp_start_millis = 0;
   
   for (;;)
   {
     // expiration phase
     statistics.is_inspiration_from_automat = 0;
-    valve_C_close();
-    valve_A_open();
-    valve_B_open();
+    valve_C_close(); // this is duplicate
     valve_D_open();
     uint8_t peep_target_reached = 0;
     uint8_t bottle_kPa_target_reached = 0;
+    
+    uint8_t fio2_state = 1; // state automat - fio2 mixing
+    
+    
     
     do{
       while( xSemaphoreTake( xStatisticsSemaphore, ( TickType_t ) 5 ) == pdFALSE ){ 
@@ -171,10 +178,14 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
       }
       p_act = statistics.p_act;
       p_o2 = statistics.p_o2;
+      set_o2 = statistics.set_o2;
       
       peep_target = statistics.set_peep;
       bottle_kPa_target = 1/statistics.set_ie * 50 + 100; // 100 kPa -only for testing... range 150 to 250 kPa in bottle
+      
+      
       lung_pressure_target_cmH20 = statistics.set_max_p;
+      set_rr = statistics.set_rr;
       
       xSemaphoreGive( xStatisticsSemaphore );
       
@@ -187,15 +198,74 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
         valve_B_close();        
         bottle_kPa_target_reached = 1;
       }
+      
+      switch(fio2_state){
+        case 1: // measure bottle at the beginning
+          bottle_p_begin = p_o2;
+          bottle_p_range = bottle_kPa_target - bottle_p_begin;
+          bottle_p_o2_target = bottle_p_begin + bottle_p_range/79*(set_o2-21);
+
+          if(set_o2 > 21){
+            valve_A_open(); // start filling oxygen
+            fio2_state = 2;
+          }else{
+            fio2_state = 3;
+          }
+          break;
+        case 2: // oxygen filling
+          if(p_o2 >= bottle_p_o2_target){
+            valve_A_close();
+            fio2_state = 3;
+          }
+          break;
+        case 3:
+          if(set_o2 < 100){
+            valve_B_open();
+            fio2_state = 4;
+          }else{
+            fio2_state = 5; 
+            bottle_kPa_target_reached = 1;
+          }
+          break;
+        case 4:
+          if(p_o2 >= bottle_kPa_target){
+            valve_B_close();
+            fio2_state = 5;
+            bottle_kPa_target_reached = 1;
+          }
+          break;
+        default:
+          break;
+      }
+      
+      
     }while(!(peep_target_reached && bottle_kPa_target_reached));
     valve_D_close();
     valve_A_close();
     valve_B_close();  
     
+
+    
     // PEEP -delay phase
-    vTaskDelay(50);
+    float one_cyce_ms = 60000 / set_rr; // How long shall breathing cycle take (ms)
+    float last_cycle_without_delay_ms = millis() - last_insp_start_millis; // How long was the last breathing cycle excluding peep delay (ms)
+    float peep_delay = one_cyce_ms - last_cycle_without_delay_ms; // new peep delay (ms)
+    if(peep_delay < 0){
+      // TODO cannot reach requested RR!
+      peep_delay = 0;
+    }
+    if(peep_delay > MAX_PEEP_DELAY_MS){
+      peep_delay = MAX_PEEP_DELAY_MS;
+    }
+    
+    if(last_insp_start_millis == 0){ // first breath = wait generic time
+       vTaskDelay(50);
+    }else{
+      vTaskDelay(peep_delay / (1000/configTICK_RATE_HZ));   
+    }
     
     // inspiration phase
+    last_insp_start_millis = millis();
     statistics.is_inspiration_from_automat = 1;    
     vTaskDelay(2); // let the Statistics do the PEEP measurement
 
@@ -208,9 +278,11 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
       }
       p_act = statistics.p_act;
       p_o2 = statistics.p_o2;
+      set_tv = statistics.set_tv;
+      slm_sum = statistics.slm_sum;
       xSemaphoreGive( xStatisticsSemaphore );
       
-    }while(p_act < lung_pressure_target_cmH20);
+    }while((p_act < lung_pressure_target_cmH20) && (slm_sum < set_tv));
 
     valve_C_close();
 
