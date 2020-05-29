@@ -155,13 +155,19 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
   float bottle_p_range;
   float lung_pressure_target_cmH20 = 30;
 
-  float p_act, p_o2, set_tv, slm_sum, set_rr, set_o2;
+  float p_act, p_o2, set_tv, slm_sum, set_rr, set_o2, set_ie;
   
   uint32_t last_insp_start_millis = 0;
+  uint32_t last_exp_start_millis = 0;
+  uint32_t ti = 0, te = 0;
   
-  for (;;)
+  float delay_pe = 0;
+  float delay_pi = 0;
+  
+  for (;;) // breathing cycle
   {
     // expiration phase
+    last_exp_start_millis = millis();
     statistics.is_inspiration_from_automat = 0;
     valve_C_close(); // this is duplicate
     valve_D_open();
@@ -169,7 +175,7 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
     uint8_t bottle_kPa_target_reached = 0;
     
     uint8_t fio2_state = 1; // state automat - fio2 mixing
-    
+        
     
     
     do{
@@ -179,10 +185,11 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
       p_act = statistics.p_act;
       p_o2 = statistics.p_o2;
       set_o2 = statistics.set_o2;
+      set_ie = statistics.set_ie;
       
       peep_target = statistics.set_peep;
-      bottle_kPa_target = 1/statistics.set_ie * 50 + 100; // 100 kPa -only for testing... range 150 to 250 kPa in bottle
-      
+      //bottle_kPa_target = 1/statistics.set_ie * 50 + 100; // 100 kPa -only for testing... range 150 to 250 kPa in bottle
+      bottle_kPa_target = 200;
       
       lung_pressure_target_cmH20 = statistics.set_max_p;
       set_rr = statistics.set_rr;
@@ -239,14 +246,44 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
       }
       
       
-    }while(!(peep_target_reached && bottle_kPa_target_reached));
+    }while(!(peep_target_reached && bottle_kPa_target_reached)); // te phase end
     valve_D_close();
     valve_A_close();
     valve_B_close();  
     
-
+    te = millis() - last_exp_start_millis;
     
-    // PEEP -delay phase
+    
+    // PEEP -delay phase pe
+    uint32_t one_cyce_ms = 60000 / set_rr; // How long shall breathing cycle take (ms)
+    uint32_t te = millis() - last_exp_start_millis; 
+    
+    float TE;
+    TE = one_cyce_ms/(1 + (set_ie));
+    delay_pe = TE - te;
+    
+    /*
+    When input pressure is low, bottle refilling takes longer time. This prolongs the expiration phase.
+    If I:E is set to 1 (i.e. 1:1), the algorithm would prolong the inspiration phase too, thus lowering the RR.
+    This may lead to undershooting set RR and therefore lowering the minute ventilation.
+    We prefer to keep RR constant prior to I:E. Therefore we need to make correction if delay_pi was negative.  
+    */
+    
+    if(delay_pi < 0 && delay_pe >= 0){  // 
+      delay_pe += delay_pi; // prevent decreasing RR to keep I:E. RR has priority!
+      if(delay_pe < 0) delay_pe = 0; // prevent accumulation of RR debt
+    }
+
+    if(delay_pe > MAX_PEEP_DELAY_MS){
+      delay_pe = MAX_PEEP_DELAY_MS;
+    }
+    
+    if(delay_pe > 0){
+      vTaskDelay(delay_pe / (1000/configTICK_RATE_HZ));   
+    }
+    
+    /*
+        // PEEP -delay phase
     float one_cyce_ms = 60000 / set_rr; // How long shall breathing cycle take (ms)
     float last_cycle_without_delay_ms = millis() - last_insp_start_millis; // How long was the last breathing cycle excluding peep delay (ms)
     float peep_delay = one_cyce_ms - last_cycle_without_delay_ms; // new peep delay (ms)
@@ -263,6 +300,7 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
     }else{
       vTaskDelay(peep_delay / (1000/configTICK_RATE_HZ));   
     }
+    */
     
     // inspiration phase
     last_insp_start_millis = millis();
@@ -271,6 +309,7 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
 
     valve_C_open();
 
+    
 
     do{
       while( xSemaphoreTake( xStatisticsSemaphore, ( TickType_t ) 5 ) == pdFALSE ){ 
@@ -285,10 +324,37 @@ void TaskValve( void *pvParameters __attribute__((unused)) )  // This is a Task.
     }while((p_act < lung_pressure_target_cmH20) && (slm_sum < set_tv));
 
     valve_C_close();
-
-    // Plateau delay phase
-    vTaskDelay(30);
     
+    ti = millis() - last_insp_start_millis;
+
+    // Plateau delay phase pi
+    
+    uint32_t ti = millis() - last_insp_start_millis; 
+    
+    float TI;
+    TI = one_cyce_ms/(1 + (1/set_ie));
+   
+    delay_pi = TI - ti;
+    
+    /*
+    When input pressure is low, bottle refilling takes longer time. This prolongs the expiration phase.
+    If I:E is set to 1 (i.e. 1:1), the algorithm would prolong the inspiration phase too, thus lowering the RR.
+    This may lead to undershooting set RR and therefore lowering the minute ventilation.
+    We prefer to keep RR constant prior to I:E. Therefore we need to make correction if delay_pe was negative.  
+    */
+    
+    if(delay_pe < 0 && delay_pi >= 0){  // 
+      delay_pi += delay_pe; // prevent decreasing RR to keep I:E. RR has priority!
+      if(delay_pi < 0) delay_pi = 0; // prevent accumulation of RR debt
+    }     
+    
+    if(delay_pi > MAX_TI_DELAY_MS){
+      delay_pi = MAX_TI_DELAY_MS;
+    }
+    
+    if(delay_pi > 0){
+      vTaskDelay(delay_pi / (1000/configTICK_RATE_HZ));   
+    }
     
  //   vTaskDelay(1);  // one tick delay (15ms)
   }

@@ -22,7 +22,10 @@ extern SemaphoreHandle_t xStatisticsSemaphore;
 #define MIN_EXPIRATION_TIME_MS 600
 
 // max time to prolong expiration (ms)
-#define MAX_PEEP_DELAY_MS 4500
+#define MAX_PEEP_DELAY_MS 4600
+
+// max time to prolong inspiration (ms)
+#define MAX_TI_DELAY_MS 2300
 
 // maximum value ADC on used MCU
 #define ADC_MAXVAL (1023)
