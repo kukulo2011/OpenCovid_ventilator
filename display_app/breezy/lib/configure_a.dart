@@ -11,6 +11,31 @@ import 'package:charts_flutter/flutter.dart' as charts;
 import 'configure.dart';
 import 'utils.dart';
 
+/*
+MIT License
+
+Copyright (c) 2020,2021 Bill Foote
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ */
+
+
 // This module contains the Android-specific realizations of the generic
 // classes in configure.dart.
 
@@ -110,7 +135,8 @@ class JsonBreezyConfiguration extends AndroidBreezyConfiguration {
   /// Throws various kinds of exceptions on malformed input
   static JsonBreezyConfiguration fromJson(
       Map<Object, Object> jsonSrc, DebugSink debug) {
-    final json = JsonHelper<Color, charts.Color>(jsonSrc, AndroidColorHelper(), debug);
+    final json =
+        JsonHelper<Color, charts.Color>(jsonSrc, AndroidColorHelper(), debug);
     json.debug?.start('BreeezyConfiguration');
     json.expect('type', 'BreezyConfiguration');
     final version = json['version'] as int;
@@ -162,7 +188,7 @@ class JsonBreezyConfiguration extends AndroidBreezyConfiguration {
           .listSync()
           .map((FileSystemEntity f) => path.basename(f.path))
           .toList(growable: false)
-            ..sort((s1, s2) => s1.toLowerCase().compareTo(s2.toLowerCase()));
+        ..sort((s1, s2) => s1.toLowerCase().compareTo(s2.toLowerCase()));
     } catch (ex, st) {
       print(st);
       print(ex);
@@ -212,7 +238,7 @@ class DefaultBreezyConfiguration extends AndroidBreezyConfiguration {
     final int _cr = '\r'.codeUnitAt(0);
     final int _newline = '\n'.codeUnitAt(0);
     ByteData d =
-        await AndroidBreezyConfiguration.assetBundle.load('assets/demo.log');
+        await AndroidBreezyConfiguration.assetBundle.load('assets/demo.data');
     final bytes = d.buffer.asUint8List(d.offsetInBytes, d.lengthInBytes);
     final result = List<String>();
     final lineBuffer = StringBuffer();

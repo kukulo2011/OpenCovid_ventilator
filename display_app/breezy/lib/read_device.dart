@@ -2,10 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show AssetBundle;
-import 'package:pedantic/pedantic.dart' show unawaited;
 
 import 'configure.dart';
 import 'configure_a.dart';
+import 'log.dart';
 import 'main.dart' show Log, Settings, BreezyGlobals;
 import 'data_types.dart';
 import 'configure.dart' as config;
@@ -17,7 +17,7 @@ import 'dart:math';
 /*
 MIT License
 
-Copyright (c) 2020 Bill Foote
+Copyright (c) 2020,2021 Bill Foote
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -199,7 +199,13 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
       null;
 
   Future<void> receiveLine(String line) async {
+    if (Log.detailed) {
+      Log.writeln('$this read "$line"');
+    }
     if (configReader != null) {
+      if (Log.detailed) {
+        Log.writeln('  Sending line to config reader.');
+      }
       configReader.acceptLine(line);
       if (configReader.done) {
         await _configReaderDone();
@@ -211,12 +217,14 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
       return;
     } else if (line.startsWith('meter-data:')) {
       _meterData = line.substring(11).trim().toLowerCase() != 'off';
-      Log.writeln('meterData set $_meterData from feed.');
+      Log.writeln('meterData set to $_meterData from feed.');
       return;
     } else if ('read-config' == line) {
+      Log.writeln('Reading a new configuration...');
       configReader = makeNewConfigReader();
       return;
     } else if (line.startsWith('read-config-compact:')) {
+      Log.writeln('Reading a new compact configuration...');
       try {
         int checksum = int.parse(line.substring(20), radix: 16);
         // The Linux crc32 command uses hex, so I did too.
@@ -226,6 +234,7 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
       }
       return;
     } else if ('reset-time' == line) {
+      Log.writeln('Resetting time...');
       return _resetTime();
     }
 
@@ -318,12 +327,19 @@ abstract class _ByteStreamDataSource extends DeviceDataSource
 
   Future<void> _configReaderDone() async {
     try {
+      Log.writeln('Finished reading new configuration');
       final newConfig = configReader.getResult();
       await _listener.processNewConfiguration(
           newConfig, () => _makeNextDataSource(newConfig));
+      Log.writeln('New configuration processed');
     } catch (ex, st) {
       await send('\r\n\nStack trace:  $st\r\n\n');
       await send('Error in new config:  $ex\r\n\n');
+      Log.writeln();
+      Log.writeln('$st');
+      Log.writeln();
+      Log.writeln('Error in new config:  $ex');
+      Log.writeln();
     } finally {
       configReader = null;
     }

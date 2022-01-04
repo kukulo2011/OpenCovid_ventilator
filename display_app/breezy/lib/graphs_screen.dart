@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:charts_flutter/flutter.dart' as charts;
-import 'package:screen/screen.dart' show Screen;
-import 'package:pedantic/pedantic.dart';
+import 'package:wakelock/wakelock.dart' show Wakelock;
 import 'configure_a.dart';
+import 'log.dart';
 import 'value_box.dart';
 import 'rolling_chart.dart';
 import 'dart:async';
@@ -17,7 +17,7 @@ import 'fitted_text.dart';
 /*
 MIT License
 
-Copyright (c) 2020 Bill Foote
+Copyright (c) 2020,2021 Bill Foote
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -162,7 +162,7 @@ class _GraphsScreenState extends State<_GraphsScreen>
       // Execute this in a microtask.  The data source reserves the right
       // to take some time before it completes its future, so that it can
       // report an error, if needed.
-      await Screen.keepOn(true);
+      await Wakelock.enable(); // Keep screen on
       try {
         await _dataSource.start(this);
       } catch (ex, st) {
@@ -189,7 +189,7 @@ class _GraphsScreenState extends State<_GraphsScreen>
     _dataSource.stop();
     _screenOnCount--;
     if (_screenOnCount == 0) {
-      unawaited(Screen.keepOn(false));
+      unawaited(Wakelock.disable());
     }
   }
 

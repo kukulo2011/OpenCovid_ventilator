@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
-import 'package:pedantic/pedantic.dart' show unawaited;
 import 'package:usb_serial/usb_serial.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
     show BluetoothConnection, FlutterBluetoothSerial, BluetoothDevice;
 
 import 'configure.dart';
+import 'log.dart';
 import 'main.dart' show Log, Settings, BreezyGlobals;
 import 'dart:async';
 import 'dart:convert';
@@ -16,7 +16,7 @@ import 'dart:math';
 /*
 MIT License
 
-Copyright (c) 2020 Bill Foote
+Copyright (c) 2020,2021 Bill Foote
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

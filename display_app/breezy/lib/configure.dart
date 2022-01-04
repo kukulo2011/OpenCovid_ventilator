@@ -11,7 +11,7 @@ import 'data_types.dart';
 /*
 MIT License
 
-Copyright (c) 2020 Bill Foote
+Copyright (c) 2020,2021 Bill Foote
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -39,9 +39,7 @@ mixin _Commentable {
   List<String> _comment;
 
   void comment(String c) {
-    if (_comment == null) {
-      _comment = List<String>();
-    }
+    _comment ??= List<String>();
     _comment.add(c);
   }
 

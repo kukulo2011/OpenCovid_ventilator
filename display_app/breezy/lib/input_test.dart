@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show AssetBundle;
+import 'log.dart';
 import 'reader.dart';
 import 'dart:async';
-import 'package:pedantic/pedantic.dart' show unawaited;
 
 import 'main.dart' show BreezyGlobals, InputSource, Log;
 /*
 MIT License
 
-Copyright (c) 2020 Bill Foote
+Copyright (c) 2020,2021 Bill Foote
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -43,7 +43,7 @@ class InputTestPage extends StatefulWidget {
 class _InputTestPageState extends State<InputTestPage>
     implements Log, StringStreamListener {
   var _text = StringBuffer();
-  static const _maxTextSize = 10000; // 10 K is more than enoough text.
+  static const _maxTextSize = 10000; // 10 K is more than enough text.
   ByteStreamReader reader;
   DateTime pauseUntil;
   int bytesReceived = 0;

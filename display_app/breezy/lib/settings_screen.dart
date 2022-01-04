@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:pedantic/pedantic.dart';
 import 'configure_a.dart'
     show JsonBreezyConfiguration, DefaultBreezyConfiguration;
 import 'utils.dart';
@@ -17,7 +18,7 @@ import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
 /*
 MIT License
 
-Copyright (c) 2020 Bill Foote
+Copyright (c) 2020,2021 Bill Foote
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

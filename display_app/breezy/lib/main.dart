@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show AssetBundle, rootBundle;
-import 'package:pedantic/pedantic.dart';
+import 'package:network_info_plus/network_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:connectivity/connectivity.dart'
     show Connectivity, ConnectivityResult;
@@ -13,6 +13,7 @@ import 'package:package_info/package_info.dart' show PackageInfo;
 import 'package:url_launcher/url_launcher.dart' show launch;
 import 'dart:io' show exit, File, Directory, NetworkInterface;
 import 'dart:convert' as convert;
+import 'log.dart';
 import 'utils.dart';
 import 'input_test.dart';
 import 'graphs_screen.dart';
@@ -24,7 +25,7 @@ import 'configure_a.dart' as config;
 /*
 MIT License
 
-Copyright (c) 2020 Bill Foote
+Copyright (c) 2020,2021 Bill Foote
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -46,7 +47,6 @@ SOFTWARE.
  */
 
 void main() async {
-  // Get there first!
   LicenseRegistry.addLicense(() {
     return _getLicenses();
   });
@@ -61,20 +61,6 @@ Stream<LicenseEntry> _getLicenses() async* {
     print(st);
     print(ex);
   }
-}
-
-abstract class Log {
-  // TODO:  Send this to an internal buffer, so we can access it from a menu
-  static void writeln([Object o = '']) {
-    print(o);
-    for (final l in listeners) {
-      l.notifyWriteln(o);
-    }
-  }
-
-  static final listeners = List<Log>();
-
-  void notifyWriteln(Object o);
 }
 
 class MyApp extends StatelessWidget {
@@ -128,10 +114,14 @@ class BreezyGlobals {
       final conn = Connectivity();
       switch (await conn.checkConnectivity()) {
         case ConnectivityResult.wifi:
-          result.add(await conn.getWifiIP());
+          try {
+            result.add('Wifi network, ${await NetworkInfo().getWifiIP()}');
+          } catch (ex) {
+            result.add('Wifi network, address unknown');
+          }
           break;
         case ConnectivityResult.mobile:
-          result.add('Moblie network, address unknown');
+          result.add('Mobile network, address unknown');
           break;
         case ConnectivityResult.none:
           result.add('No local IP address found');
@@ -251,7 +241,7 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                         },
                         child: Row(
                           children: <Widget>[
-                            Text('Show Graph Screeen'),
+                            Text('Show Graph Screen'),
                             Spacer(),
                             Icon(Icons.timeline, color: Colors.black)
                           ],
@@ -277,6 +267,19 @@ class _BreezyHomePageState extends State<BreezyHomePage>
                             Text('Settings'),
                             Spacer(),
                             Icon(Icons.settings, color: Colors.black)
+                          ],
+                        )),
+                    PopupMenuItem<void Function()>(
+                        value: () async {
+                          var ls = LogScreen();
+                          unawaited(Navigator.push<void>(context,
+                              MaterialPageRoute(builder: (context) => ls)));
+                        },
+                        child: Row(
+                          children: <Widget>[
+                            Text('Logging'),
+                            Spacer(),
+                            Icon(Icons.fire_extinguisher, color: Colors.black)
                           ],
                         )),
                     PopupMenuItem(
@@ -460,7 +463,9 @@ class Settings {
   static File settingsFile;
   final listeners = List<SettingsListener>();
   InputSource _inputSource = InputSource.sampleLog;
-  String _httpUrl = 'https://breezy-display.jovial.com/weather_demo.breezy';
+  String _httpUrl = 'http://breezy-display.jovial.com/weather_demo.breezy';
+  // http, not https, due to Android "Let's Encrypt" bug.  Cf.
+  // https://1-grid.com/blogs/web-security/older-android-versions-will-block-lets-encrypt-ssl-certificates-in-2021/
   int _serialPortNumber = 1;
   int _baudRate = 115200;
   int _socketPort = 7777;
